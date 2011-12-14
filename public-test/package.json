@@ -1,0 +1,6 @@
+{
+   "name": "public-test",
+   "version": "0.0.1",
+   "description": "Package to allow test modules to use require",
+   "main": "index.js"
+}

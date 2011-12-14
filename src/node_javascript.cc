@@ -34,7 +34,7 @@ Handle<String> MainSource() {
   return BUILTIN_ASCII_ARRAY(node_native, sizeof(node_native)-1);
 }
 
-void DefineJavaScript(v8::Handle<v8::Object> target) {
+void DefineJavaScript(v8::Handle<v8::Object> target, Node *n) {
   HandleScope scope;
 
   for (int i = 0; natives[i].name; i++) {

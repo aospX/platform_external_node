@@ -1,0 +1,75 @@
+How to build/run the sample module (simple) on device
+------
+run nodejs/tools/push_module.sh
+adb shell node /sdcard/simple-test.js [run with standalone node]
+adb shell am start -a android.intent.action.VIEW -n com.android.browser/.BrowserActivity -d file:///sdcard/simple-test.html [run with browser]
+you should see a pass in console/logcat resp..
+D/NODE    (15692): Test  PASSED: simple
+
+How to build/run sample module(simple) on desktop
+--
+mkdir ~/.node_modules
+g++ -Isrc -I/local/mnt/workspace/v8_be/include -fPIC -shared modules/simple.cc -o ~/.node_modules/simple.node (replace v8 path from your environment)
+cp modules/simple.js ~/.node_modules
+./node modules/simple-test.js
+
+How to run camera sample
+--
+run ./nodejs/tools/push_camera.sh
+run adb shell am start -a android.intent.action.VIEW -n com.android.browser/.BrowserActivity -d file:///sdcard/camera.html
+it should take a picture and show in the view
+
+How to run unit tests (test/simple)
+--
+refer to nodejs/tools/test_node_*py
+
+How to run chat example (unverified in latest nodejs build) - FIXME
+----
+- build node and install the libraries
+adb push /local/mnt/workspace/froyo-latest/out/target/product/qsd8250_ffa/system/bin/node /system/bin/node
+adb push /local/mnt/workspace/froyo-latest/out/target/product/qsd8250_ffa/system/lib/simple.so /system/lib/node_modules
+adb push /local/mnt/workspace/froyo-latest/out/target/product/qsd8250_ffa/system/lib/libnode.so /system/lib
+adb push /local/mnt/workspace/froyo-latest/out/target/product/qsd8250_ffa/system/lib/libcares.so /system/lib
+
+- checkout socket.io
+git clone git://github.com/LearnBoost/Socket.IO-node.git socket.io --recursive
+
+- push the socket.io code to /sdcard/
+adb push socket.io /sdcard/socket.io
+
+- run the chat node server
+adb shell node /sdcard/socket.io/example/server.js
+should show the following output
+6 Jan 00:04:49 - socket.io ready - accepting connections
+
+- connect from the browser
+adb shell am start -a android.intent.action.VIEW -n com.android.browser/.BrowserActivity -d http://localhost:808
+
+The sample chat client should be running..
+
+
+========================sqlite tests====================
+ported https://github.com/grumdrig/node-sqlite.git, the changes are placed in modules/proteus/sqlite/patch
+built as a static module
+- to run on desktop
+build node
+./node modules/proteus/sqlite-sync/[test.js/speedtest.js]
+
+- to run on device (browser)
+push the sqlite.js src and other test files
+adb push modules/proteus/sqlite-sync/sqlite.js /data/data/com.android.browser/.proteus/downloads
+adb push modules/proteus/sqlite-sync/[test.js/speedtest.js] /data/data/com.android.browser/.proteus/downloads
+adb shell am start  -a android.intent.action.VIEW -n com.android.browser/.BrowserActivity -d file:///sdcard/[speedtest/test].html
+
+==========================sqlite3==================
+https://github.com/developmentseed/node-sqlite3
+- desktop
+build node, export NODE_MODULE_PATH=modules/proteus/sqlite3/lib
+and ./nodejs/tools/test_node_desktop_shell.py modules/proteus/sqlite3/test/ |egrep "PASSED|FAILED"
+To run individual tests, ./node modules/proteus/sqlite3/test/affected.test.js
+
+- android browser
+adb push modules/proteus/sqlite3/lib/ /sdcard/
+create /sdcard/sqlite3 and adb push modules/protes/sqlite3/test /sdcard/sqlite3
+./nodejs/tools/test_node_android_browser.py sqlite3
+To run individual tests, ./nodejs/tools/test_node_android_browser.sh sqlite3/prepare.test.js

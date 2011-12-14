@@ -1,0 +1,6 @@
+{
+   "name": "proteusModLoader",
+   "version": "0.0.1",
+   "description": "Package to download modules OTA",
+   "main": "./lib/proteusModLoader.js"
+}

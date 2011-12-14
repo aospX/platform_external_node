@@ -1,0 +1,29 @@
+<html>
+<head>
+<script>
+
+nodejs();
+var PackageExtractor = navigator.loadModule('PackageExtractor.js');
+
+
+function successCB(package){
+	console.log("Magic Number:" + package.magicNumber);
+	console.log("Version:" + package.version);
+	console.log("Public Key Length:" + package.publicKeyLength);
+	console.log("Signature Length:" + package.signatureLength);
+	console.log("Public Key:" + package.publicKey);
+	console.log("Signature:" + package.signature);
+	console.log("Zip Contents:" + package.zip);
+}
+
+var crxFile = "/sdcard/print.crx";
+PackageExtractor.packageExtractor.extract(crxFile, successCB);
+
+
+
+</script>
+</head>
+<body>
+</body>
+</html>
+

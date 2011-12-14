@@ -19,26 +19,30 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef SRC_EVENTS_H_
-#define SRC_EVENTS_H_
+// test unzipping a file that was created with a non-node gzip lib,
+// piped in as fast as possible.
 
-#include <node_object_wrap.h>
-#include <v8.h>
+var common = require('../common.js');
+var assert = require('assert');
+var zlib = require('zlib');
+var path = require('path');
 
-namespace node {
+var gunzip = zlib.createGunzip();
 
-class EventEmitter : public ObjectWrap {
- public:
-  static void Initialize(v8::Local<v8::FunctionTemplate> ctemplate);
-  static v8::Persistent<v8::FunctionTemplate> constructor_template;
+var fs = require('fs');
 
-  bool Emit(v8::Handle<v8::String> event,
-            int argc,
-            v8::Handle<v8::Value> argv[]);
+var fixture = path.resolve(common.fixturesDir, 'person.jpg.gz');
+var unzippedFixture = path.resolve(common.fixturesDir, 'person.jpg');
+var outputFile = path.resolve(common.tmpDir, 'person.jpg');
+var expect = fs.readFileSync(unzippedFixture);
+var inp = fs.createReadStream(fixture);
+var out = fs.createWriteStream(outputFile);
 
- protected:
-  EventEmitter() : ObjectWrap () { }
-};
-
-}  // namespace node
-#endif  // SRC_EVENTS_H_
+inp.pipe(gunzip).pipe(out);
+out.on('close', function() {
+  var actual = fs.readFileSync(outputFile);
+  assert.equal(actual.length, expect.length, 'length should match');
+  for (var i = 0, l = actual.length; i < l; i++) {
+    assert.equal(actual[i], expect[i], 'byte['+i+']');
+  }
+});

@@ -1,0 +1,21 @@
+<script>
+function onLoad() {
+  console.log('Test : timeout.html');
+  nodejs();
+  var assert = require('assert');
+  test.enable();
+  test.addwatcher();
+  var timerCalled = false;
+  setTimeout(function() {
+      console.log ('timeout called');
+      timerCalled = true;
+      test.removewatcher();
+      }, 2000);
+
+  process.addListener('exit', function() {
+      assert.equal(timerCalled, true);
+  });
+}
+</script>
+<body onload='onLoad()'>
+</body>

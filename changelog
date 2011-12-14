@@ -1,0 +1,104 @@
+12/12
+cleanup for release, remove FS module, move sqlite to external/node-sqlite*, put back deleted test files, disable assert, remove libzipfile
+
+12/10
+support breaking debugger and reporting js and native trace from module code - a new api test.break() is added
+
+12/9
+expose browser window object to module as process.window
+
+12/8
+fire process.exit event when the node is destroyed, this can be used by modules to cleanup
+
+12/6
+camera node interface change to bind directly to the dom element
+
+12/5
+export the type of require (native or dynamic), useful for debugging
+
+12/2
+support overriding building native (.so/.node) modules
+IC porting
+
+12/1
+sqlite sync changes for event emitter, changes to work with framework and tests
+pull in sqlite sync version from https://github.com/grumdrig/node-sqlite.git
+
+11/30
+Make loadmodule asynchronous
+
+11/29
+allow builtin modules to be overridden by dynamic modules
+
+11/24
+Final restructuring of loadmodule, installation paths, removing the need for test mode
+
+11/21
+Allow running multiple tests without closing window shell
+ev loop can restart and sleeps if there is no work pending
+add sigsegv handler for node shell (not in browser)
+
+11/18
+disallow access to relative and absoluate paths from loadModule
+revert setTimeout and addWatcher hacks from test-exception-handler.js since with separate node context we dont need it
+changes to run_tests.sh, support target and test path
+remove nodejs() call and use loadModule to bootstrap nodejs and load module on the first request and just load module on subsequent requests
+
+11/17
+use process.__filename only for testing, expose api to set the test name
+
+Freeze node context builtins, added tests
+added run_tests.sh to simplify running tests on browser/desktop which opens a terminal and shows the output
+
+11/16
+Add tests for package.json
+
+Fix crash in requestPermission due to cross context access, moved requestPermission to process object
+which sets the right context
+
+WEBAPP-45, simplify node<->webkit event handling through abstract classes instead of function pointers
+move webkit->node interaction as events instead of function calls (more flexible)
+add internal events (e.g. release between node and module)
+
+11/15
+remove incorrect license from qcom created files, add multi context v8 unit tests
+
+11/14
+Fix test/proteus/test-navigator-loadModule.js since now navigator is on process.window
+make browser global object available to modules as process.window, now that we have a separate context
+
+11/10
+Add mkdirsSync and rmdirsSync api to fs.js
+Security - run node in a separate context
+Security - use node timers in node context and not the browser setTimeout api
+
+11/8
+move _LOG to NODE_LOG
+Generic callback interface for Node calls in to webkit
+
+11/7
+rename LOG<> macros to _LOG<> to avoid system conflicts and rename 'using namespasce' in node header
+
+11/4
+Fix webkit logging using node macros, override webkit NDEBUG and previously defined LOG tags
+
+11/3
+Fix path resolution due to Module.proteusPath being an array and not a string
+Add zlib module from latest nodejs
+Fix issue in path resolution due to proteusPath being a array, should be a string
+
+11/3/11
+* loadModule and require redesign
+* hide Buffer from global object
+* remove dead/unused code from node.js and module.js
+* disable use of stdio
+* added hole to expose internal modules in user js for test purposes (TBR)
+* isTestMode usage removed in node.js module.js, its required now to keep the ev loop live and report test results
+
+11/1
+* changed test-exception-handler.js to work in browser, one to ensure the loop is active since we use timer, 2, to throw exception through process.tick which we catch
+* disabled GC timers, with out this the idle timers dont seem to fire e.g. test-http-host-headers.js
+* add skip list for android shell and browser
+
+
+

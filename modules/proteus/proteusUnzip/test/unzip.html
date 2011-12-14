@@ -1,0 +1,19 @@
+<html>
+<script>
+function onLoad() {
+
+    var runtest = navigator.loadModule('test', function(runtest){
+    var proteusUnzipTest = runtest.require('proteusUnzip/test/proteusUnzipTest.js');
+
+    proteusUnzipTest.unzipTests (function (result){
+      document.write(result);
+    });
+  }, function(err){
+    document.write(err);
+  });
+}
+
+</script>
+<body onload="onLoad()">
+</body>
+</html>

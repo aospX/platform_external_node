@@ -46,5 +46,9 @@ NODE_EXT_LIST_ITEM(node_timer_wrap)
 NODE_EXT_LIST_ITEM(node_tcp_wrap)
 NODE_EXT_LIST_ITEM(node_cares_wrap)
 
+NODE_EXT_LIST_ITEM(node_permission)
+NODE_EXT_LIST_ITEM(node_sqlite_sync)
+NODE_EXT_LIST_ITEM(node_unzip)
+
 NODE_EXT_LIST_END
 

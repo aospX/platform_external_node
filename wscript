@@ -100,7 +100,6 @@ def set_options(opt):
                 , dest='without_ssl'
                 )
 
-
   opt.add_option('--shared-v8'
                 , action='store_true'
                 , default=False
@@ -186,7 +185,7 @@ def set_options(opt):
                 , help='Build with DTrace (experimental)'
                 , dest='dtrace'
                 )
- 
+
 
   opt.add_option( '--product-type'
                 , action='store'
@@ -204,8 +203,12 @@ def set_options(opt):
                 , dest='dest_cpu'
                 )
 
-
-
+  opt.add_option( '--libzipfile-path'
+                , action='store'
+                , default=None
+                , help='lizipfile directory, should contain .a, zipfile.h'
+                , dest='libzipfile_path'
+                )
 
 def configure(conf):
   conf.check_tool('compiler_cxx')
@@ -275,14 +278,14 @@ def configure(conf):
       Options.options.use_openssl = conf.env["USE_OPENSSL"] = True
       conf.env.append_value("CPPFLAGS", "-DHAVE_OPENSSL=1")
     else:
-      if o.openssl_libpath: 
+      if o.openssl_libpath:
         openssl_libpath = [o.openssl_libpath]
       elif not sys.platform.startswith('win32'):
         openssl_libpath = ['/usr/lib', '/usr/local/lib', '/opt/local/lib', '/usr/sfw/lib']
       else:
         openssl_libpath = [normpath(join(cwd, '../openssl'))]
 
-      if o.openssl_includes: 
+      if o.openssl_includes:
         openssl_includes = [o.openssl_includes]
       elif not sys.platform.startswith('win32'):
         openssl_includes = [];
@@ -369,6 +372,18 @@ def configure(conf):
     if not conf.check(lib='kstat', uselib_store="KSTAT"):
       conf.fatal("Cannot find kstat library")
 
+  #proteus: Moving up so that v8 check below adds -m32
+  if 'DEST_CPU' in conf.env:
+    arch = conf.env['DEST_CPU']
+    # TODO: -m32 is only available on 64 bit machines, so check host type
+    flags = None
+    if arch == 'ia32':
+      flags = '-m32'
+    if flags:
+      conf.env.append_value('CCFLAGS', flags)
+      conf.env.append_value('CXXFLAGS', flags)
+      conf.env.append_value('LINKFLAGS', flags)
+
   if conf.env['USE_SHARED_V8']:
     v8_includes = [];
     if o.shared_v8_includes: v8_includes.append(o.shared_v8_includes);
@@ -390,6 +405,13 @@ def configure(conf):
                             includes=v8_includes,
                             libpath=v8_libpath):
         conf.fatal("Cannot find v8_g")
+
+
+  if not conf.check_cxx(lib='zipfile', header_name='zipfile/zipfile.h',
+                          uselib_store='ZIPFILE',
+                          includes=o.libzipfile_path,
+                          libpath=o.libzipfile_path):
+      conf.fatal("Cannot find libzipfile")
 
   conf.define("HAVE_CONFIG_H", 1)
 
@@ -413,16 +435,6 @@ def configure(conf):
       if arch in arch_mappings:
         arch = arch_mappings[arch]
       flags = ['-arch', arch]
-      conf.env.append_value('CCFLAGS', flags)
-      conf.env.append_value('CXXFLAGS', flags)
-      conf.env.append_value('LINKFLAGS', flags)
-  if 'DEST_CPU' in conf.env:
-    arch = conf.env['DEST_CPU']
-    # TODO: -m32 is only available on 64 bit machines, so check host type
-    flags = None
-    if arch == 'ia32':
-      flags = '-m32'
-    if flags:
       conf.env.append_value('CCFLAGS', flags)
       conf.env.append_value('CXXFLAGS', flags)
       conf.env.append_value('LINKFLAGS', flags)
@@ -506,6 +518,7 @@ def configure(conf):
   conf.env.append_value('CXXFLAGS', default_compile_flags)
   conf.write_config_header("config.h")
 
+  conf.env['CFLAGS'] = conf.env['CCFLAGS'];
 
 def v8_cmd(bld, variant):
   scons = join(cwd, 'tools/scons/scons.py')
@@ -626,6 +639,12 @@ def build_uv(bld):
   uv.env.env['CXX'] = sh_escape(bld.env['CXX'][0])
   uv.env.env['CPPFLAGS'] = "-DPTW32_STATIC_LIB"
 
+  # proteus:
+  uv.env.env['CPPFLAGS'] +=  " -I. -I../../../../src";
+
+  if bld.env['DEST_CPU']=='ia32':
+    uv.env.env['CPPFLAGS'] +=  " -m32 "
+
   t = join(bld.srcnode.abspath(bld.env_of_name("default")), uv.target)
   bld.env_of_name('default').append_value("LINKFLAGS_UV", t)
 
@@ -657,6 +676,7 @@ def build(bld):
   Options.options.jobs=jobs
   product_type = Options.options.product_type
   product_type_is_lib = product_type != 'program'
+  dtrace = Options.options.dtrace
 
   print "DEST_OS: " + bld.env['DEST_OS']
   print "DEST_CPU: " + bld.env['DEST_CPU']
@@ -737,8 +757,9 @@ def build(bld):
     source.append(macros_loc_debug)
     js2c.JS2C(source, targets)
 
+  modloaderjslist = ' ' + bld.path.ant_glob('modules/proteus/proteusModLoader/lib/*.js') + ' ' + bld.path.ant_glob('modules/proteus/proteusPackageExtractor/lib/*.js') + ' ' + bld.path.ant_glob('modules/proteus/proteusUnzip/lib/*.js') + ' ../../external/node-sqlite-sync/sqlite.js '
   native_cc = bld.new_task_gen(
-    source='src/node.js ' + bld.path.ant_glob('lib/*.js'),
+    source='src/node.js ' + bld.path.ant_glob('lib/*.js') + modloaderjslist,
     target="src/node_natives.h",
     before="cxx",
     install_path=None
@@ -823,7 +844,7 @@ def build(bld):
   node = bld.new_task_gen("cxx", product_type)
   node.name         = "node"
   node.target       = "node"
-  node.uselib = 'RT OPENSSL CARES EXECINFO DL KVM SOCKET NSL KSTAT UTIL OPROFILE'
+  node.uselib = 'RT OPENSSL CARES EXECINFO DL KVM SOCKET NSL KSTAT UTIL OPROFILE ZIPFILE'
   node.add_objects = 'http_parser'
   if product_type_is_lib:
     node.install_path = '${LIBDIR}'
@@ -837,7 +858,6 @@ def build(bld):
     src/node_extensions.cc
     src/node_http_parser.cc
     src/node_constants.cc
-    src/node_events.cc
     src/node_file.cc
     src/node_script.cc
     src/node_os.cc
@@ -860,10 +880,18 @@ def build(bld):
     node.source += " src/node_stdio.cc "
     node.source += " src/node_child_process.cc "
     node.source += " src/node_timer.cc "
+    node.source += " proteus/main.cc "
+
+  # proteus: add sync sqlite as builtin module - https://github.com/grumdrig/node-sqlite.git
+  node.source += " ../../external/node-sqlite-sync/sqlite3_bindings.cc "
+
+  # Modloader
+  node.source += " modules/proteus/proteusUnzip/src/node_unzip.cc "
+
+  # add permissions
+  node.source += " src/node_permission.cc "
 
   node.source += bld.env["PLATFORM_FILE"]
-  if not product_type_is_lib:
-    node.source = 'src/node_main.cc '+node.source
 
   if bld.env["USE_OPENSSL"]: node.source += " src/node_crypto.cc "
 
@@ -874,6 +902,8 @@ def build(bld):
     deps/uv/src/ev
     deps/uv/src/ares
   """
+  # proteus: link dependancy for sqlite
+  bld.env.append_value('LINKFLAGS', '-lsqlite3');
 
   if not bld.env["USE_SHARED_V8"]: node.includes += ' deps/v8/include '
 
@@ -922,7 +952,6 @@ def build(bld):
     src/node.h
     src/node_object_wrap.h
     src/node_buffer.h
-    src/node_events.h
     src/node_version.h
   """)
 

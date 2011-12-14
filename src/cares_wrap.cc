@@ -23,7 +23,7 @@
 #include <node.h>
 #include <uv.h>
 
-#if defined(__OpenBSD__) || defined(__MINGW32__)
+#if defined(__OpenBSD__) || defined(__MINGW32__) || defined(ANDROID)
 # include <nameser.h>
 #else
 # include <arpa/nameser.h>
@@ -49,19 +49,7 @@ namespace node {
 
 namespace cares_wrap {
 
-using v8::Arguments;
-using v8::Array;
-using v8::Context;
-using v8::Function;
-using v8::Handle;
-using v8::HandleScope;
-using v8::Integer;
-using v8::Local;
-using v8::Null;
-using v8::Object;
-using v8::Persistent;
-using v8::String;
-using v8::Value;
+using namespace v8;
 
 static Persistent<String> onanswer_sym;
 
@@ -149,7 +137,11 @@ class QueryWrap {
     object_ = Persistent<Object>::New(Object::New());
   }
 
+#ifdef ANDROID
+  virtual ~QueryWrap() {
+#else
   ~QueryWrap() {
+#endif
     assert(!object_.IsEmpty());
 
     object_->DeleteHiddenValue(onanswer_sym);
@@ -170,10 +162,12 @@ class QueryWrap {
   // Subclasses should implement the appropriate Send method.
   virtual int Send(const char* name) {
     assert(0);
+    return 0;
   }
 
   virtual int Send(const char* name, int family) {
     assert(0);
+    return 0;
   }
 
  protected:

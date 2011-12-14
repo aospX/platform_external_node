@@ -22,8 +22,8 @@
 #include <v8.h>
 
 namespace node {
-
-void DefineJavaScript(v8::Handle<v8::Object> target);
+class Node;
+void DefineJavaScript(v8::Handle<v8::Object> target, Node *n);
 v8::Handle<v8::String> MainSource();
 
 }  // namespace node

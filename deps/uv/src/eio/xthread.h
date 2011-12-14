@@ -126,6 +126,10 @@ typedef pthread_t xthread_t;
 # define X_STACKSIZE sizeof (long) * 4096
 #endif
 
+#ifdef ANDROID
+#include <mman.h> // to define PAGE_SIZE
+#endif
+
 static int
 thread_create (xthread_t *tid, void *(*proc)(void *), void *arg)
 {

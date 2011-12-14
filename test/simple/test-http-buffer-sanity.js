@@ -41,7 +41,8 @@ var web = http.Server(function(req, res) {
   var i = 0;
 
   req.on('data', function(d) {
-    process.stdout.write(',');
+    // proteus: stdout write disabled
+    //process.stdout.write(',');
     measuredSize += d.length;
     for (var j = 0; j < d.length; j++) {
       assert.equal(buffer[i], d[j]);

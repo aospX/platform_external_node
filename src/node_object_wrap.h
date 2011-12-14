@@ -36,7 +36,9 @@ class ObjectWrap {
 
   virtual ~ObjectWrap ( ) {
     if (!handle_.IsEmpty()) {
-      assert(handle_.IsNearDeath());
+      // This is no more valid since we can destroy the native instance when the node
+      // instance is deleted and no more rely on the JS GC cycle to delete native objects
+      // assert(handle_.IsNearDeath());
       handle_.ClearWeak();
       handle_->SetInternalField(0, v8::Undefined());
       handle_.Dispose();

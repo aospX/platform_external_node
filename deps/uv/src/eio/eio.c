@@ -2,6 +2,7 @@
  * libeio implementation
  *
  * Copyright (c) 2007,2008,2009,2010 Marc Alexander Lehmann <libeio@schmorp.de>
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modifica-
@@ -48,7 +49,6 @@
 // # define PTW32_STATIC_LIB 1
 // #endif
 #include "xthread.h"
-
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -60,8 +60,13 @@
 #include <fcntl.h>
 #include <assert.h>
 
+// proteus: fix rename warning
+#include <stdio.h>
+
+#ifndef ANDROID
 #ifndef _WIN32
 #include <sys/statvfs.h>
+#endif
 #endif
 
 #ifndef EIO_FINISH
@@ -286,7 +291,8 @@ typedef struct etp_worker
   ETP_WORKER_COMMON
 } etp_worker;
 
-static etp_worker wrk_first = { &wrk_first, &wrk_first, 0 }; /* NOT etp */
+// proteus: fix g++ warning, add initializers for req and worker_common
+static etp_worker wrk_first = { &wrk_first, &wrk_first, 0, 0, 0, 0 }; /* NOT etp */
 
 #define ETP_WORKER_LOCK(wrk)   X_LOCK   (wrklock)
 #define ETP_WORKER_UNLOCK(wrk) X_UNLOCK (wrklock)
@@ -455,7 +461,9 @@ static void etp_atfork_child (void)
 static void
 etp_once_init (void)
 {    
+#ifndef ANDROID
   X_THREAD_ATFORK (etp_atfork_prepare, etp_atfork_parent, etp_atfork_child);
+#endif
 }
 
 static int
@@ -583,8 +591,8 @@ static int etp_poll (void)
       if (maxtime)
         {
           gettimeofday (&tv_now, 0);
-
-          if (tvdiff (&tv_start, &tv_now) >= maxtime)
+          // proteus: fix g++ warning, mapped tvdiff return to a unsigned
+          if ((unsigned int) tvdiff (&tv_start, &tv_now) >= maxtime)
             break;
         }
     }
@@ -678,7 +686,8 @@ static void etp_set_max_parallel (unsigned int nthreads)
 
 static void grp_try_feed (eio_req *grp)
 {
-  while (grp->size < grp->int2 && !EIO_CANCELLED (grp))
+  // proteus: fix g++ warning
+  while ( (long) grp->size < grp->int2 && !EIO_CANCELLED (grp))
     {
       grp->flags &= ~EIO_FLAG_GROUPADD;
 
@@ -1116,7 +1125,8 @@ eio_dent_radix_sort (eio_dirent *dents, int size, signed char score_bits, ino_t 
   /* which is used to skip bits that are 0 everywhere, which is very common */
   {
     ino_t endianness;
-    int i, j;
+    // proteus: fix g++ warning, make i,j unsigned int
+    unsigned int i, j;
 
     /* we store the byte offset of byte n into byte n of "endianness" */
     for (i = 0; i < sizeof (ino_t); ++i)
@@ -1290,9 +1300,11 @@ eio__scandir (eio_req *req, etp_worker *self)
             req->int1   = flags;
             req->result = dentoffs;
 
-            if (flags & EIO_READDIR_STAT_ORDER)
+            // proteus: g++ warning, explicit braces
+            if (flags & EIO_READDIR_STAT_ORDER) {
               eio_dent_sort (dents, dentoffs, 0, inode_bits); /* sort by inode exclusively */
-            else if (flags & EIO_READDIR_DIRS_FIRST)
+            }
+            else if (flags & EIO_READDIR_DIRS_FIRST) {
               if (flags & EIO_READDIR_FOUND_UNKNOWN)
                 eio_dent_sort (dents, dentoffs, 7, inode_bits); /* sort by score and inode */
               else
@@ -1319,6 +1331,7 @@ eio__scandir (eio_req *req, etp_worker *self)
                   /* now sort the dirs only */
                   eio_dent_sort (dents, dir - dents, 0, inode_bits);
                 }
+            }
 
             break;
           }
@@ -1560,11 +1573,13 @@ eio__mtouch (void *mem, size_t len, int flags)
     intptr_t end = addr + len;
     intptr_t page = eio_pagesize ();
 
-    if (addr < end)
+    // proteus: fix g++ warning
+    if (addr < end) {
       if (flags & EIO_MT_MODIFY) /* modify */
-        do { *((volatile sig_atomic_t *)addr) |= 0; } while ((addr += page) < len);
+        do { *((volatile sig_atomic_t *)addr) |= 0; } while ((size_t)(addr += page) < len);
       else
-        do { *((volatile sig_atomic_t *)addr)     ; } while ((addr += page) < len);
+        do { *((volatile sig_atomic_t *)addr)     ; } while ((size_t)(addr += page) < len);
+    }
   }
 
   return 0;
@@ -1731,11 +1746,12 @@ static void eio_execute (etp_worker *self, eio_req *req)
                           req->result = fstat     (req->int1, (EIO_STRUCT_STAT *)req->ptr2); break;
 
 #ifndef _WIN32
+#ifndef ANDROID
       case EIO_STATVFS:   ALLOC (sizeof (EIO_STRUCT_STATVFS));
                           req->result = statvfs   (req->ptr1, (EIO_STRUCT_STATVFS *)req->ptr2); break;
       case EIO_FSTATVFS:  ALLOC (sizeof (EIO_STRUCT_STATVFS));
                           req->result = fstatvfs  (req->int1, (EIO_STRUCT_STATVFS *)req->ptr2); break;
-
+#endif
       case EIO_CHOWN:     req->result = chown     (req->ptr1, req->int2, req->int3); break;
       case EIO_FCHOWN:    req->result = fchown    (req->int1, req->int2, req->int3); break;
 #endif

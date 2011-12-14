@@ -43,6 +43,8 @@
 #include <sys/sysctl.h>
 #endif
 
+// proteus: Fix g++ warning
+#include <sys/uio.h>
 
 static uv_err_t last_err;
 
@@ -639,7 +641,8 @@ static uv_req_t* uv__write(uv_tcp_t* tcp) {
 
       assert(req->write_index < req->bufcnt);
 
-      if (n < len) {
+      // proteus: Fix g++ warning
+      if (n < (ssize_t) len) {
         buf->base += n;
         buf->len -= n;
         tcp->write_queue_size -= n;
@@ -1166,7 +1169,7 @@ static void uv__check(EV_P_ ev_check* w, int revents) {
 
 int uv_check_init(uv_check_t* check) {
   uv__handle_init((uv_handle_t*)check, UV_CHECK);
-  uv_counters()->check_init;
+  uv_counters()->check_init++;
 
   ev_check_init(&check->check_watcher, uv__check);
   check->check_watcher.data = check;
@@ -1303,6 +1306,7 @@ int uv_async_init(uv_async_t* async, uv_async_cb async_cb) {
 
 int uv_async_send(uv_async_t* async) {
   ev_async_send(EV_DEFAULT_UC_ &async->async_watcher);
+  return 0;
 }
 
 
@@ -1413,6 +1417,9 @@ static uv_ares_task_t* uv__ares_task_create(int fd) {
 
   h->read_watcher.data = h;
   h->write_watcher.data = h;
+
+  // proteus: Fix build error
+  return h;
 }
 
 
@@ -1542,9 +1549,10 @@ static int uv_getaddrinfo_done(eio_req* req) {
 static int getaddrinfo_thread_proc(eio_req *req) {
   uv_getaddrinfo_t* handle = req->data;
 
+  // proteus: Fix handle->hints should be passed and not its address
   handle->retcode = getaddrinfo(handle->hostname,
                                 handle->service,
-                                &handle->hints,
+                                handle->hints,
                                 &handle->res);
   return 0;
 }

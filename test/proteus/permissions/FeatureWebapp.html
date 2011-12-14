@@ -1,0 +1,77 @@
+<html>
+<head>
+<script type="text/javascript">
+
+   var permission;
+
+   navigator.loadModule('test', function(testmod){
+   permission = testmod.require('permission');
+   });
+
+   function start()
+   {
+       var testStatus = "";
+       document.getElementById("startFeaturePermissionTest").innerHTML = testPrivilegedFeatures();
+       document.getElementById("startFeaturePermissionTest").innerHTML += testPermissionLevel();
+       testRequestPermission();
+   }
+
+   function testPrivilegedFeatures()
+   {
+       var testStatus = "=============privilegedfeatures=====================";
+       var list = permission.privilegedFeatures;
+       testStatus += "<br />";
+       var list = permission.privilegedFeatures;
+       for(i = 0; i<list.length; i++)
+       {
+           testStatus += list[i];
+	   testStatus += "<br />";
+       }
+       return testStatus;
+   }
+
+   function testPermissionLevel()
+   {
+       var testStatus = "=============permissionLevel()=====================" +  "<br />";
+       var list = permission.privilegedFeatures;
+       for(i = 0; i<list.length; i++)
+       {
+           var value = permission.permissionLevel(list[i]);
+           testStatus += list[i] + " : " + value + "<br />";
+       } 
+       return testStatus;
+   }
+
+   function permissionCB(permValue)
+   {
+       document.getElementById("startFeaturePermissionTest").innerHTML += permValue + "<br />";
+   }
+
+   function testRequestPermission()
+   {
+       var testStatus = "=============requestPermission()=====================";
+       var list = permission.privilegedFeatures;
+       for(i = 0; i<list.length; i++)
+       {
+           var requestedFeaturePermissions = new Array();
+           var start = Math.floor(Math.random()*list.length);
+           var end = Math.floor(Math.random()*list.length);
+           for(j = start; j<end; j++)
+           {
+               requestedFeaturePermissions[j-start] = list[j];  
+           }
+           permission.requestPermission(requestedFeaturePermissions, permissionCB);
+       }
+   }
+
+</script>
+</head>
+
+<body>
+    <h1>Test Feature permissions Module</h1>
+
+    <button type="button" onclick="start()" id="startFeaturePermissionTest">Start Feature Permission tests</button>
+
+</body>
+</html>
+

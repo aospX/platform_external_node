@@ -1,4 +1,5 @@
 // Copyright Joyent, Inc. and other Node contributors.
+// Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the
@@ -37,13 +38,16 @@
 # define OPENSSL_CONST
 #endif
 
-#define ASSERT_IS_STRING_OR_BUFFER(val) \
+#define NODE_ASSERT_IS_STRING_OR_BUFFER(val) \
   if (!val->IsString() && !Buffer::HasInstance(val)) { \
     return ThrowException(Exception::TypeError(String::New("Not a string or buffer"))); \
   }
 
-static const char *PUBLIC_KEY_PFX =  "-----BEGIN PUBLIC KEY-----";
-static const int PUBLIC_KEY_PFX_LEN = strlen(PUBLIC_KEY_PFX);
+static const char PUBLIC_KEY_PFX[] =  "-----BEGIN PUBLIC KEY-----";
+static const int PUBLIC_KEY_PFX_LEN = sizeof(PUBLIC_KEY_PFX) - 1;
+
+static const char PUBRSA_KEY_PFX[] =  "-----BEGIN RSA PUBLIC KEY-----";
+static const int PUBRSA_KEY_PFX_LEN = sizeof(PUBRSA_KEY_PFX) - 1;
 
 namespace node {
 namespace crypto {
@@ -160,7 +164,8 @@ static BIO* LoadBIO (Handle<Value> v) {
 
   HandleScope scope;
 
-  int r;
+  // proteus: fix g++ warning
+  int r = 0;
 
   if (v->IsString()) {
     String::Utf8Value s(v->ToString());
@@ -1622,8 +1627,8 @@ class Cipher : public ObjectWrap {
         "Must give cipher-type, key")));
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t key_buf_len = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t key_buf_len = Node::DecodeBytes(args[1], BINARY);
 
     if (key_buf_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -1631,7 +1636,7 @@ class Cipher : public ObjectWrap {
     }
 
     char* key_buf = new char[key_buf_len];
-    ssize_t key_written = DecodeWrite(key_buf, key_buf_len, args[1], BINARY);
+    ssize_t key_written = Node::DecodeWrite(key_buf, key_buf_len, args[1], BINARY);
     assert(key_written == key_buf_len);
 
     String::Utf8Value cipherType(args[0]->ToString());
@@ -1660,16 +1665,16 @@ class Cipher : public ObjectWrap {
         "Must give cipher-type, key, and iv as argument")));
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t key_len = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t key_len = Node::DecodeBytes(args[1], BINARY);
 
     if (key_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
       return ThrowException(exception);
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[2]);
-    ssize_t iv_len = DecodeBytes(args[2], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[2]);
+    ssize_t iv_len = Node::DecodeBytes(args[2], BINARY);
 
     if (iv_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -1677,11 +1682,11 @@ class Cipher : public ObjectWrap {
     }
 
     char* key_buf = new char[key_len];
-    ssize_t key_written = DecodeWrite(key_buf, key_len, args[1], BINARY);
+    ssize_t key_written = Node::DecodeWrite(key_buf, key_len, args[1], BINARY);
     assert(key_written == key_len);
 
     char* iv_buf = new char[iv_len];
-    ssize_t iv_written = DecodeWrite(iv_buf, iv_len, args[2], BINARY);
+    ssize_t iv_written = Node::DecodeWrite(iv_buf, iv_len, args[2], BINARY);
     assert(iv_written == iv_len);
 
     String::Utf8Value cipherType(args[0]->ToString());
@@ -1703,10 +1708,10 @@ class Cipher : public ObjectWrap {
 
     HandleScope scope;
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
 
-    enum encoding enc = ParseEncoding(args[1]);
-    ssize_t len = DecodeBytes(args[0], enc);
+    enum encoding enc = Node::ParseEncoding(args[1]);
+    ssize_t len = Node::DecodeBytes(args[0], enc);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -1723,7 +1728,7 @@ class Cipher : public ObjectWrap {
       r = cipher->CipherUpdate(buffer_data, buffer_length, &out, &out_len);
     } else {
       char* buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], enc);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], enc);
       assert(written == len);
       r = cipher->CipherUpdate(buf, len,&out,&out_len);
       delete [] buf;
@@ -1741,7 +1746,7 @@ class Cipher : public ObjectWrap {
     } else {
       if (args.Length() <= 2 || !args[2]->IsString()) {
         // Binary
-        outString = Encode(out, out_len, BINARY);
+        outString = Node::Encode(out, out_len, BINARY);
       } else {
         char* out_hexdigest;
         int out_hex_len;
@@ -1749,7 +1754,7 @@ class Cipher : public ObjectWrap {
         if (strcasecmp(*encoding, "hex") == 0) {
           // Hex encoding
           HexEncode(out, out_len, &out_hexdigest, &out_hex_len);
-          outString = Encode(out_hexdigest, out_hex_len, BINARY);
+          outString = Node::Encode(out_hexdigest, out_hex_len, BINARY);
           delete [] out_hexdigest;
         } else if (strcasecmp(*encoding, "base64") == 0) {
           // Base64 encoding
@@ -1779,10 +1784,10 @@ class Cipher : public ObjectWrap {
           }
 
           base64(out, out_len, &out_hexdigest, &out_hex_len);
-          outString = Encode(out_hexdigest, out_hex_len, BINARY);
+          outString = Node::Encode(out_hexdigest, out_hex_len, BINARY);
           delete [] out_hexdigest;
         } else if (strcasecmp(*encoding, "binary") == 0) {
-          outString = Encode(out, out_len, BINARY);
+          outString = Node::Encode(out, out_len, BINARY);
         } else {
           fprintf(stderr, "node-crypto : Cipher .update encoding "
                           "can be binary, hex or base64\n");
@@ -1800,9 +1805,10 @@ class Cipher : public ObjectWrap {
 
     HandleScope scope;
 
-    unsigned char* out_value;
+    // proteus: fix g++ warning, initialize out_value, out_hexdigest
+    unsigned char* out_value = 0;
     int out_len;
-    char* out_hexdigest;
+    char* out_hexdigest = 0;
     int out_hex_len;
     Local<Value> outString ;
 
@@ -1814,20 +1820,20 @@ class Cipher : public ObjectWrap {
 
     if (args.Length() == 0 || !args[0]->IsString()) {
       // Binary
-      outString = Encode(out_value, out_len, BINARY);
+      outString = Node::Encode(out_value, out_len, BINARY);
     } else {
       String::Utf8Value encoding(args[0]->ToString());
       if (strcasecmp(*encoding, "hex") == 0) {
         // Hex encoding
         HexEncode(out_value, out_len, &out_hexdigest, &out_hex_len);
-        outString = Encode(out_hexdigest, out_hex_len, BINARY);
+        outString = Node::Encode(out_hexdigest, out_hex_len, BINARY);
         delete [] out_hexdigest;
       } else if (strcasecmp(*encoding, "base64") == 0) {
         base64(out_value, out_len, &out_hexdigest, &out_hex_len);
-        outString = Encode(out_hexdigest, out_hex_len, BINARY);
+        outString = Node::Encode(out_hexdigest, out_hex_len, BINARY);
         delete [] out_hexdigest;
       } else if (strcasecmp(*encoding, "binary") == 0) {
-        outString = Encode(out_value, out_len, BINARY);
+        outString = Node::Encode(out_value, out_len, BINARY);
       } else {
         fprintf(stderr, "node-crypto : Cipher .final encoding "
                         "can be binary, hex or base64\n");
@@ -1990,8 +1996,8 @@ class Decipher : public ObjectWrap {
         "Must give cipher-type, key as argument")));
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t key_len = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t key_len = Node::DecodeBytes(args[1], BINARY);
 
     if (key_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -1999,7 +2005,7 @@ class Decipher : public ObjectWrap {
     }
 
     char* key_buf = new char[key_len];
-    ssize_t key_written = DecodeWrite(key_buf, key_len, args[1], BINARY);
+    ssize_t key_written = Node::DecodeWrite(key_buf, key_len, args[1], BINARY);
     assert(key_written == key_len);
 
     String::Utf8Value cipherType(args[0]->ToString());
@@ -2028,16 +2034,16 @@ class Decipher : public ObjectWrap {
         "Must give cipher-type, key, and iv as argument")));
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t key_len = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t key_len = Node::DecodeBytes(args[1], BINARY);
 
     if (key_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
       return ThrowException(exception);
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[2]);
-    ssize_t iv_len = DecodeBytes(args[2], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[2]);
+    ssize_t iv_len = Node::DecodeBytes(args[2], BINARY);
 
     if (iv_len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -2045,11 +2051,11 @@ class Decipher : public ObjectWrap {
     }
 
     char* key_buf = new char[key_len];
-    ssize_t key_written = DecodeWrite(key_buf, key_len, args[1], BINARY);
+    ssize_t key_written = Node::DecodeWrite(key_buf, key_len, args[1], BINARY);
     assert(key_written == key_len);
 
     char* iv_buf = new char[iv_len];
-    ssize_t iv_written = DecodeWrite(iv_buf, iv_len, args[2], BINARY);
+    ssize_t iv_written = Node::DecodeWrite(iv_buf, iv_len, args[2], BINARY);
     assert(iv_written == iv_len);
 
     String::Utf8Value cipherType(args[0]->ToString());
@@ -2071,12 +2077,12 @@ class Decipher : public ObjectWrap {
 
     Decipher *cipher = ObjectWrap::Unwrap<Decipher>(args.This());
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
 
-    ssize_t len = DecodeBytes(args[0], BINARY);
+    ssize_t len = Node::DecodeBytes(args[0], BINARY);
     if (len < 0) {
         return ThrowException(Exception::Error(String::New(
-            "node`DecodeBytes() failed")));
+            "node`Node::DecodeBytes() failed")));
     }
 
     char* buf;
@@ -2092,7 +2098,7 @@ class Decipher : public ObjectWrap {
     } else {
       alloc_buf = true;
       buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], BINARY);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], BINARY);
       assert(written == len);
     }
 
@@ -2165,9 +2171,9 @@ class Decipher : public ObjectWrap {
     if (out_len==0) {
       outString=String::New("");
     } else if (args.Length() <= 2 || !args[2]->IsString()) {
-      outString = Encode(out, out_len, BINARY);
+      outString = Node::Encode(out, out_len, BINARY);
     } else {
-      enum encoding enc = ParseEncoding(args[2]);
+      enum encoding enc = Node::ParseEncoding(args[2]);
       if (enc == UTF8) {
         // See if we have any overhang from last utf8 partial ending
         if (cipher->incomplete_utf8!=NULL) {
@@ -2189,9 +2195,9 @@ class Decipher : public ObjectWrap {
           cipher->incomplete_utf8 = new unsigned char[cipher->incomplete_utf8_len+1];
           memcpy(cipher->incomplete_utf8, &out[utf8_len], cipher->incomplete_utf8_len);
         }
-        outString = Encode(out, utf8_len, enc);
+        outString = Node::Encode(out, utf8_len, enc);
       } else {
-        outString = Encode(out, out_len, enc);
+        outString = Node::Encode(out, out_len, enc);
       }
     }
 
@@ -2219,9 +2225,9 @@ class Decipher : public ObjectWrap {
 
 
     if (args.Length() == 0 || !args[0]->IsString()) {
-      outString = Encode(out_value, out_len, BINARY);
+      outString = Node::Encode(out_value, out_len, BINARY);
     } else {
-      enum encoding enc = ParseEncoding(args[0]);
+      enum encoding enc = Node::ParseEncoding(args[0]);
       if (enc == UTF8) {
         // See if we have any overhang from last utf8 partial ending
         if (cipher->incomplete_utf8!=NULL) {
@@ -2232,13 +2238,13 @@ class Decipher : public ObjectWrap {
           delete [] cipher->incomplete_utf8;
           cipher->incomplete_utf8=NULL;
 
-          outString = Encode(complete_out, cipher->incomplete_utf8_len+out_len, enc);
+          outString = Node::Encode(complete_out, cipher->incomplete_utf8_len+out_len, enc);
           delete [] complete_out;
         } else {
-          outString = Encode(out_value, out_len, enc);
+          outString = Node::Encode(out_value, out_len, enc);
         }
       } else {
-        outString = Encode(out_value, out_len, enc);
+        outString = Node::Encode(out_value, out_len, enc);
       }
     }
     delete [] out_value;
@@ -2263,9 +2269,9 @@ class Decipher : public ObjectWrap {
 
 
     if (args.Length() == 0 || !args[0]->IsString()) {
-      outString = Encode(out_value, out_len, BINARY);
+      outString = Node::Encode(out_value, out_len, BINARY);
     } else {
-      enum encoding enc = ParseEncoding(args[0]);
+      enum encoding enc = Node::ParseEncoding(args[0]);
       if (enc == UTF8) {
         // See if we have any overhang from last utf8 partial ending
         if (cipher->incomplete_utf8!=NULL) {
@@ -2276,13 +2282,13 @@ class Decipher : public ObjectWrap {
           delete [] cipher->incomplete_utf8;
           cipher->incomplete_utf8 = NULL;
 
-          outString = Encode(complete_out, cipher->incomplete_utf8_len+out_len, enc);
+          outString = Node::Encode(complete_out, cipher->incomplete_utf8_len+out_len, enc);
           delete [] complete_out;
         } else {
-          outString = Encode(out_value, out_len, enc);
+          outString = Node::Encode(out_value, out_len, enc);
         }
       } else {
-        outString = Encode(out_value, out_len, enc);
+        outString = Node::Encode(out_value, out_len, enc);
       }
     }
     delete [] out_value;
@@ -2378,8 +2384,8 @@ class Hmac : public ObjectWrap {
         "Must give hashtype string as argument")));
     }
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t len = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t len = Node::DecodeBytes(args[1], BINARY);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -2387,7 +2393,7 @@ class Hmac : public ObjectWrap {
     }
 
     char* buf = new char[len];
-    ssize_t written = DecodeWrite(buf, len, args[1], BINARY);
+    ssize_t written = Node::DecodeWrite(buf, len, args[1], BINARY);
     assert(written == len);
 
     String::Utf8Value hashType(args[0]->ToString());
@@ -2408,9 +2414,9 @@ class Hmac : public ObjectWrap {
 
     HandleScope scope;
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    enum encoding enc = ParseEncoding(args[1]);
-    ssize_t len = DecodeBytes(args[0], enc);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    enum encoding enc = Node::ParseEncoding(args[1]);
+    ssize_t len = Node::DecodeBytes(args[0], enc);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -2427,7 +2433,7 @@ class Hmac : public ObjectWrap {
       r = hmac->HmacUpdate(buffer_data, buffer_length);
     } else {
       char* buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], enc);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], enc);
       assert(written == len);
       r = hmac->HmacUpdate(buf, len);
       delete [] buf;
@@ -2446,9 +2452,10 @@ class Hmac : public ObjectWrap {
 
     HandleScope scope;
 
-    unsigned char* md_value;
+    // proteus: initialize md_value
+    unsigned char* md_value = 0;
     unsigned int md_len;
-    char* md_hexdigest;
+    char* md_hexdigest = 0;
     int md_hex_len;
     Local<Value> outString ;
 
@@ -2460,20 +2467,20 @@ class Hmac : public ObjectWrap {
 
     if (args.Length() == 0 || !args[0]->IsString()) {
       // Binary
-      outString = Encode(md_value, md_len, BINARY);
+      outString = Node::Encode(md_value, md_len, BINARY);
     } else {
       String::Utf8Value encoding(args[0]->ToString());
       if (strcasecmp(*encoding, "hex") == 0) {
         // Hex encoding
         HexEncode(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "base64") == 0) {
         base64(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "binary") == 0) {
-        outString = Encode(md_value, md_len, BINARY);
+        outString = Node::Encode(md_value, md_len, BINARY);
       } else {
         fprintf(stderr, "node-crypto : Hmac .digest encoding "
                         "can be binary, hex or base64\n");
@@ -2560,9 +2567,9 @@ class Hash : public ObjectWrap {
 
     Hash *hash = ObjectWrap::Unwrap<Hash>(args.This());
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    enum encoding enc = ParseEncoding(args[1]);
-    ssize_t len = DecodeBytes(args[0], enc);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    enum encoding enc = Node::ParseEncoding(args[1]);
+    ssize_t len = Node::DecodeBytes(args[0], enc);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -2578,7 +2585,7 @@ class Hash : public ObjectWrap {
       r = hash->HashUpdate(buffer_data, buffer_length);
     } else {
       char* buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], enc);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], enc);
       assert(written == len);
       r = hash->HashUpdate(buf, len);
       delete[] buf;
@@ -2616,7 +2623,7 @@ class Hash : public ObjectWrap {
 
     if (args.Length() == 0 || !args[0]->IsString()) {
       // Binary
-      outString = Encode(md_value, md_len, BINARY);
+      outString = Node::Encode(md_value, md_len, BINARY);
     } else {
       String::Utf8Value encoding(args[0]->ToString());
       if (strcasecmp(*encoding, "hex") == 0) {
@@ -2624,16 +2631,16 @@ class Hash : public ObjectWrap {
         char* md_hexdigest;
         int md_hex_len;
         HexEncode(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "base64") == 0) {
         char* md_hexdigest;
         int md_hex_len;
         base64(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "binary") == 0) {
-        outString = Encode(md_value, md_len, BINARY);
+        outString = Node::Encode(md_value, md_len, BINARY);
       } else {
         fprintf(stderr, "node-crypto : Hash .digest encoding "
                         "can be binary, hex or base64\n");
@@ -2756,9 +2763,9 @@ class Sign : public ObjectWrap {
 
     HandleScope scope;
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    enum encoding enc = ParseEncoding(args[1]);
-    ssize_t len = DecodeBytes(args[0], enc);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    enum encoding enc = Node::ParseEncoding(args[1]);
+    ssize_t len = Node::DecodeBytes(args[0], enc);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -2775,7 +2782,7 @@ class Sign : public ObjectWrap {
       r = sign->SignUpdate(buffer_data, buffer_length);
     } else {
       char* buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], enc);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], enc);
       assert(written == len);
       r = sign->SignUpdate(buf, len);
       delete [] buf;
@@ -2803,8 +2810,8 @@ class Sign : public ObjectWrap {
     md_len = 8192; // Maximum key size is 8192 bits
     md_value = new unsigned char[md_len];
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    ssize_t len = DecodeBytes(args[0], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    ssize_t len = Node::DecodeBytes(args[0], BINARY);
 
     if (len < 0) {
       delete [] md_value;
@@ -2813,7 +2820,7 @@ class Sign : public ObjectWrap {
     }
 
     char* buf = new char[len];
-    ssize_t written = DecodeWrite(buf, len, args[0], BINARY);
+    ssize_t written = Node::DecodeWrite(buf, len, args[0], BINARY);
     assert(written == len);
 
     int r = sign->SignFinal(&md_value, &md_len, buf, len);
@@ -2827,20 +2834,20 @@ class Sign : public ObjectWrap {
 
     if (args.Length() == 1 || !args[1]->IsString()) {
       // Binary
-      outString = Encode(md_value, md_len, BINARY);
+      outString = Node::Encode(md_value, md_len, BINARY);
     } else {
       String::Utf8Value encoding(args[1]->ToString());
       if (strcasecmp(*encoding, "hex") == 0) {
         // Hex encoding
         HexEncode(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "base64") == 0) {
         base64(md_value, md_len, &md_hexdigest, &md_hex_len);
-        outString = Encode(md_hexdigest, md_hex_len, BINARY);
+        outString = Node::Encode(md_hexdigest, md_hex_len, BINARY);
         delete [] md_hexdigest;
       } else if (strcasecmp(*encoding, "binary") == 0) {
-        outString = Encode(md_value, md_len, BINARY);
+        outString = Node::Encode(md_value, md_len, BINARY);
       } else {
         outString = String::New("");
         fprintf(stderr, "node-crypto : Sign .sign encoding "
@@ -2931,6 +2938,18 @@ class Verify : public ObjectWrap {
         ERR_print_errors_fp(stderr);
         return 0;
       }
+    } else if (strncmp(key_pem, PUBRSA_KEY_PFX, PUBRSA_KEY_PFX_LEN) == 0) {
+      RSA* rsa = PEM_read_bio_RSAPublicKey(bp, NULL, NULL, NULL);
+      if (rsa) {
+        pkey = EVP_PKEY_new();
+        if (pkey)
+          EVP_PKEY_set1_RSA(pkey, rsa);
+        RSA_free(rsa);
+      }
+      if (pkey == NULL) {
+        ERR_print_errors_fp(stderr);
+        return 0;
+      }
     } else {
       // X.509 fallback
       x509 = PEM_read_bio_X509(bp, NULL, NULL, NULL);
@@ -3000,9 +3019,9 @@ class Verify : public ObjectWrap {
 
     Verify *verify = ObjectWrap::Unwrap<Verify>(args.This());
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    enum encoding enc = ParseEncoding(args[1]);
-    ssize_t len = DecodeBytes(args[0], enc);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    enum encoding enc = Node::ParseEncoding(args[1]);
+    ssize_t len = Node::DecodeBytes(args[0], enc);
 
     if (len < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -3019,7 +3038,7 @@ class Verify : public ObjectWrap {
       r = verify->VerifyUpdate(buffer_data, buffer_length);
     } else {
       char* buf = new char[len];
-      ssize_t written = DecodeWrite(buf, len, args[0], enc);
+      ssize_t written = Node::DecodeWrite(buf, len, args[0], enc);
       assert(written == len);
       r = verify->VerifyUpdate(buf, len);
       delete [] buf;
@@ -3039,8 +3058,8 @@ class Verify : public ObjectWrap {
 
     Verify *verify = ObjectWrap::Unwrap<Verify>(args.This());
 
-    ASSERT_IS_STRING_OR_BUFFER(args[0]);
-    ssize_t klen = DecodeBytes(args[0], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[0]);
+    ssize_t klen = Node::DecodeBytes(args[0], BINARY);
 
     if (klen < 0) {
       Local<Value> exception = Exception::TypeError(String::New("Bad argument"));
@@ -3048,11 +3067,11 @@ class Verify : public ObjectWrap {
     }
 
     char* kbuf = new char[klen];
-    ssize_t kwritten = DecodeWrite(kbuf, klen, args[0], BINARY);
+    ssize_t kwritten = Node::DecodeWrite(kbuf, klen, args[0], BINARY);
     assert(kwritten == klen);
 
-    ASSERT_IS_STRING_OR_BUFFER(args[1]);
-    ssize_t hlen = DecodeBytes(args[1], BINARY);
+    NODE_ASSERT_IS_STRING_OR_BUFFER(args[1]);
+    ssize_t hlen = Node::DecodeBytes(args[1], BINARY);
 
     if (hlen < 0) {
       delete [] kbuf;
@@ -3061,7 +3080,7 @@ class Verify : public ObjectWrap {
     }
 
     unsigned char* hbuf = new unsigned char[hlen];
-    ssize_t hwritten = DecodeWrite((char *)hbuf, hlen, args[1], BINARY);
+    ssize_t hwritten = Node::DecodeWrite((char *)hbuf, hlen, args[1], BINARY);
     assert(hwritten == hlen);
     unsigned char* dbuf;
     int dlen;
@@ -3232,7 +3251,7 @@ class DiffieHellman : public ObjectWrap {
     if (args.Length() > 0 && args[0]->IsString()) {
       outString = EncodeWithEncoding(args[0], data, dataSize);
     } else {
-      outString = Encode(data, dataSize, BINARY);
+      outString = Node::Encode(data, dataSize, BINARY);
     }
     delete[] data;
 
@@ -3258,7 +3277,7 @@ class DiffieHellman : public ObjectWrap {
     if (args.Length() > 0 && args[0]->IsString()) {
       outString = EncodeWithEncoding(args[0], data, dataSize);
     } else {
-      outString = Encode(data, dataSize, BINARY);
+      outString = Node::Encode(data, dataSize, BINARY);
     }
 
     delete[] data;
@@ -3285,7 +3304,7 @@ class DiffieHellman : public ObjectWrap {
     if (args.Length() > 0 && args[0]->IsString()) {
       outString = EncodeWithEncoding(args[0], data, dataSize);
     } else {
-      outString = Encode(data, dataSize, BINARY);
+      outString = Node::Encode(data, dataSize, BINARY);
     }
 
     delete[] data;
@@ -3318,7 +3337,7 @@ class DiffieHellman : public ObjectWrap {
     if (args.Length() > 0 && args[0]->IsString()) {
       outString = EncodeWithEncoding(args[0], data, dataSize);
     } else {
-      outString = Encode(data, dataSize, BINARY);
+      outString = Node::Encode(data, dataSize, BINARY);
     }
 
     delete[] data;
@@ -3351,7 +3370,7 @@ class DiffieHellman : public ObjectWrap {
     if (args.Length() > 0 && args[0]->IsString()) {
       outString = EncodeWithEncoding(args[0], data, dataSize);
     } else {
-      outString = Encode(data, dataSize, BINARY);
+      outString = Node::Encode(data, dataSize, BINARY);
     }
 
     delete[] data;
@@ -3433,7 +3452,7 @@ class DiffieHellman : public ObjectWrap {
       } else if (args.Length() > 1 && args[1]->IsString()) {
         outString = EncodeWithEncoding(args[1], data, dataSize);
       } else {
-        outString = Encode(data, dataSize, BINARY);
+        outString = Node::Encode(data, dataSize, BINARY);
       }
     }
 
@@ -3555,9 +3574,9 @@ class DiffieHellman : public ObjectWrap {
   }
 
   static int DecodeBinary(Handle<Value> str, char** buf) {
-    int len = DecodeBytes(str);
+    int len = Node::DecodeBytes(str);
     *buf = new char[len];
-    int written = DecodeWrite(*buf, len, str, BINARY);
+    int written = Node::DecodeWrite(*buf, len, str, BINARY);
     if (written != len) {
       return -1;
     }
@@ -3607,14 +3626,14 @@ class DiffieHellman : public ObjectWrap {
     if (strcasecmp(*encoding, "hex") == 0) {
       // Hex encoding
       HexEncode(reinterpret_cast<unsigned char*>(buf), len, &retbuf, &retlen);
-      outString = Encode(retbuf, retlen, BINARY);
+      outString = Node::Encode(retbuf, retlen, BINARY);
       delete [] retbuf;
     } else if (strcasecmp(*encoding, "base64") == 0) {
       base64(reinterpret_cast<unsigned char*>(buf), len, &retbuf, &retlen);
-      outString = Encode(retbuf, retlen, BINARY);
+      outString = Node::Encode(retbuf, retlen, BINARY);
       delete [] retbuf;
     } else if (strcasecmp(*encoding, "binary") == 0) {
-      outString = Encode(buf, len, BINARY);
+      outString = Node::Encode(buf, len, BINARY);
     } else {
       fprintf(stderr, "node-crypto : Diffie-Hellman parameter encoding "
                       "can be binary, hex or base64\n");

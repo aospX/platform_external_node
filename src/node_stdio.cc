@@ -20,7 +20,6 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <node_stdio.h>
-#include <node_events.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -32,6 +31,7 @@
 # include <libutil.h>
 #elif defined(__sun)
 # include <stropts.h> // for openpty ioctls
+#elif defined(ANDROID)
 #else
 # include <pty.h>
 #endif
@@ -239,6 +239,7 @@ static Handle<Value> IsStdoutBlocking(const Arguments& args) {
 static Handle<Value> OpenPTY(const Arguments& args) {
   HandleScope scope;
 
+#ifndef ANDROID
   int master_fd, slave_fd;
 
 #ifdef __sun
@@ -271,6 +272,9 @@ typedef void (*sighandler)(int);
   a->Set(1, Integer::New(slave_fd));
 
   return scope.Close(a);
+#else
+  return v8::Undefined();
+#endif
 }
 
 

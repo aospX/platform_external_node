@@ -19,11 +19,14 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include <node_file.h>
 #include <node_stat_watcher.h>
 
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+
+// proteus: pull in 0a3fc1d9c8becc32c63ae736ca2b3719a3d03c5b - remove EventEmitter dependancy
 
 namespace node {
 
@@ -31,20 +34,15 @@ using namespace v8;
 
 Persistent<FunctionTemplate> StatWatcher::constructor_template;
 
-static Persistent<String> change_symbol;
-static Persistent<String> stop_symbol;
-
 void StatWatcher::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(StatWatcher::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
-  constructor_template->Inherit(EventEmitter::constructor_template);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(StatWatcher::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("StatWatcher"));
-
-  change_symbol = NODE_PSYMBOL("change");
-  stop_symbol = NODE_PSYMBOL("stop");
 
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "start", StatWatcher::Start);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "stop", StatWatcher::Stop);
@@ -61,13 +59,13 @@ void StatWatcher::Callback(EV_P_ ev_stat *watcher, int revents) {
   Handle<Value> argv[2];
   argv[0] = Handle<Value>(BuildStatsObject(&watcher->attr));
   argv[1] = Handle<Value>(BuildStatsObject(&watcher->prev));
-  handler->Emit(change_symbol, 2, argv);
+  Node::MakeCallback(handler->handle_, "onchange", 2, argv);
 }
 
 
 Handle<Value> StatWatcher::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
@@ -113,7 +111,7 @@ Handle<Value> StatWatcher::Start(const Arguments& args) {
 Handle<Value> StatWatcher::Stop(const Arguments& args) {
   HandleScope scope;
   StatWatcher *handler = ObjectWrap::Unwrap<StatWatcher>(args.Holder());
-  handler->Emit(stop_symbol, 0, NULL);
+  Node::MakeCallback(handler->handle_, "onstop", 0, NULL);
   handler->Stop();
   return Undefined();
 }

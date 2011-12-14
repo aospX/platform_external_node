@@ -1,0 +1,1 @@
+exports.jscall = 42;

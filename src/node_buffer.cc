@@ -171,7 +171,7 @@ Buffer* Buffer::New(char *data, size_t length,
 
 Handle<Value> Buffer::New(const Arguments &args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
@@ -199,7 +199,8 @@ Buffer::Buffer(Handle<Object> wrapper, size_t length) : ObjectWrap() {
 
 
 Buffer::~Buffer() {
-  Replace(NULL, 0, NULL, NULL);
+  // FIXME (proteus): This crashes since we are not in the right context
+  // Replace(NULL, 0, NULL, NULL);
 }
 
 
@@ -244,7 +245,7 @@ Handle<Value> Buffer::BinarySlice(const Arguments &args) {
   char *data = parent->data_ + start;
   //Local<String> string = String::New(data, end - start);
 
-  Local<Value> b =  Encode(data, end - start, BINARY);
+  Local<Value> b = Node::Encode(data, end - start, BINARY);
 
   return scope.Close(b);
 }
@@ -432,19 +433,19 @@ Handle<Value> Buffer::Copy(const Arguments &args) {
             "targetStart out of bounds")));
   }
 
-  if (source_start < 0 || source_start >= source->length_) {
+  if (source_start < 0 || source_start >= (ssize_t) source->length_) {
     return ThrowException(Exception::Error(String::New(
             "sourceStart out of bounds")));
   }
 
-  if (source_end < 0 || source_end > source->length_) {
+  if (source_end < 0 || source_end > (ssize_t) source->length_) {
     return ThrowException(Exception::Error(String::New(
             "sourceEnd out of bounds")));
   }
 
   ssize_t to_copy = MIN(MIN(source_end - source_start,
                             target_length - target_start),
-                            source->length_ - source_start);
+                            (ssize_t)source->length_ - source_start);
 
 
   // need to use slightly slower memmove is the ranges might overlap
@@ -556,7 +557,8 @@ Handle<Value> Buffer::AsciiWrite(const Arguments &args) {
 
   size_t max_length = args[2]->IsUndefined() ? buffer->length_ - offset
                                              : args[2]->Uint32Value();
-  max_length = MIN(s->Length(), MIN(buffer->length_ - offset, max_length));
+  // proteus: Fix g++ warning
+  max_length = MIN((size_t)s->Length(), MIN( (size_t)(buffer->length_ - offset), max_length));
 
   char *p = buffer->data_ + offset;
 
@@ -678,7 +680,7 @@ Handle<Value> Buffer::BinaryWrite(const Arguments &args) {
 
   size_t towrite = MIN((unsigned long) s->Length(), buffer->length_ - offset);
 
-  int written = DecodeWrite(p, towrite, s, BINARY);
+  int written = Node::DecodeWrite(p, towrite, s, BINARY);
   return scope.Close(Integer::New(written));
 }
 
@@ -693,7 +695,7 @@ Handle<Value> Buffer::ByteLength(const Arguments &args) {
   }
 
   Local<String> s = args[0]->ToString();
-  enum encoding e = ParseEncoding(args[1], UTF8);
+  enum encoding e = Node::ParseEncoding(args[1], UTF8);
 
   return scope.Close(Integer::New(node::ByteLength(s, e)));
 }
@@ -741,8 +743,14 @@ void Buffer::Initialize(Handle<Object> target) {
   length_symbol = Persistent<String>::New(String::NewSymbol("length"));
   chars_written_sym = Persistent<String>::New(String::NewSymbol("_charsWritten"));
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Buffer::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  // proteus: for multiple contexts, we need to ensure constructor template is created
+  // only one since this function gets called once for each context
+  // Node each context gets a separate function from the same template
+  if (constructor_template.IsEmpty()){
+    Local<FunctionTemplate> t = FunctionTemplate::New(Buffer::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
+
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("SlowBuffer"));
 

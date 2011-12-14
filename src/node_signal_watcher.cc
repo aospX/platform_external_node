@@ -67,13 +67,13 @@ void SignalWatcher::Callback(EV_P_ ev_signal *watcher, int revents) {
   callback->Call(w->handle_, 0, NULL);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 
 Handle<Value> SignalWatcher::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;

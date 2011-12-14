@@ -31,7 +31,7 @@
 #include <sys/types.h>
 #include <pwd.h> /* getpwnam() */
 #include <grp.h> /* getgrnam() */
-#if defined(__FreeBSD__ ) || defined(__OpenBSD__)
+#if defined(__FreeBSD__ ) || defined(__OpenBSD__) || defined(ANDROID)
 #include <sys/wait.h>
 #endif
 
@@ -421,6 +421,7 @@ int ChildProcess::Spawn(const char *file,
       if (custom_gid != -1) {
         gid = custom_gid;
       } else if (custom_gname != NULL) {
+#ifndef ANDROID
         struct group grp, *grpp = NULL;
         int err = getgrnam_r(custom_gname,
                              &grp,
@@ -434,6 +435,7 @@ int ChildProcess::Spawn(const char *file,
         }
 
         gid = grpp->gr_gid;
+#endif
       }
 
 
@@ -441,6 +443,7 @@ int ChildProcess::Spawn(const char *file,
       if (custom_uid != -1) {
         uid = custom_uid;
       } else if (custom_uname != NULL) {
+#ifndef ANDROID
         struct passwd pwd, *pwdp = NULL;
         int err = getpwnam_r(custom_uname,
                              &pwd,
@@ -454,6 +457,7 @@ int ChildProcess::Spawn(const char *file,
         }
 
         uid = pwdp->pw_uid;
+#endif
       }
 
 
@@ -551,7 +555,8 @@ void ChildProcess::OnExit(int status) {
   }
 
   if (WIFSIGNALED(status)) {
-    argv[1] = String::NewSymbol(signo_string(WTERMSIG(status)));
+    // proteus: unused code
+    //argv[1] = String::NewSymbol(signo_string(WTERMSIG(status)));
   } else {
     argv[1] = Local<Value>::New(Null());
   }
@@ -559,7 +564,7 @@ void ChildProcess::OnExit(int status) {
   onexit->Call(handle_, 2, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 

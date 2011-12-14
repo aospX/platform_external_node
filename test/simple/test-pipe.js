@@ -80,7 +80,7 @@ var tcp = net.Server(function(s) {
   var i = 0;
 
   s.on('data', function(d) {
-    process.stdout.write('.');
+    //process.stdout.write('.');
     tcpLengthSeen += d.length;
     for (var j = 0; j < d.length; j++) {
       assert.equal(buffer[i], d[j]);

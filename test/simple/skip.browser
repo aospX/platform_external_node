@@ -1,0 +1,147 @@
+test-sendfd.js
+test-delayed-require.js
+test-signal-unregister.js
+test-child-process-ipc.js
+test-stdout-to-file.js
+test-child-process-custom-fds.js
+GH-892-request.js
+test-net-isip.js
+child-process-spawn-node.js
+test-child-process-stdout-flush.js
+test-init.js
+test-pipe-head.js
+test-repl.js
+test-stdin-from-file.js
+test-http-get-pipeline-problem.js
+child-process-channel.js
+test-require-cache-without-stat.js
+test-module-loading.js
+test-executable-path.js
+test-http-full-response.js
+test-process-env.js
+test-require-resolve.js
+test-child-process-exit-code.js
+test-fs-symlink.js
+test-cli-eval.js
+test-error-reporting.js
+test-debugger-client.js
+test-child-process-exec-env.js
+test-dgram-unix-anon.js
+test-child-process-cwd.js
+test-https-simple.js
+test-child-process-double-pipe.js
+test-http-304.js
+test-tls-securepair-client.js
+test-tls-securepair-server.js
+test-sigint-infinite-loop.js
+test-child-process-double-pipe.js
+test-child-process-buffering.js
+test-os.js
+test-tls-server-verify.js
+test-child-process-env.js
+test-dgram-unix.js
+test-child-process-exec-cwd.js
+test-regress-GH-892.js
+test-fs-realpath.js
+test-http-curl-chunk-problem.js
+test-tls-ext-key-usage.js
+test-pipe-file-to-http.js
+test-child-process-channel.js
+test-child-process-spawn-node.js
+test-child-process-kill.js
+test-child-process-deprecated-api.js
+test-process-kill-null.js
+
+#uses child process
+test-eval-require.js
+
+# To be investigated
+test-http-unix-socket.js
+test-fs-chmod.js
+test-sys.js
+test-tcp-wrap.js
+test-net-pingpong.js
+
+# Following fail in browser and not in android shell
+# AssertionError: 4 == 5
+test-next-tick.js
+
+# this expects the setTimeout handler to be called even if exception
+# is thrown in later piece of code, but thats not working in browser
+test-exception-handler2.js
+
+# this is expected, since we use browser console
+test-console.js
+
+# TBI
+test-next-tick-ordering.js
+
+#AssertionError: 0 == 74
+#    at Server.<anonymous> (/mnt/sdcard/test/simple/test-net-server-on-fd-0.js:39:10)
+test-net-server-on-fd-0.js
+
+#test-net-socket-timeout.js, even though it passes, it doesnt hit the second timer TBI
+#test-signal-handler.js, multiple process
+test-signal-handler.js
+
+#AssertionError: ["nextTick","setTimeout"] deepEqual ["setTimeout","nextTick"], TBI
+#i guess this is since we use setTimeout from browser
+
+#TBI
+test-net-pingpong.js
+test-fs-utimes.js
+
+# we have blocked stdout
+test-tty-stdout-end.js
+
+test-path.js
+test-memory-usage.js
+test-child-process-stdin.js
+
+test-dgram-multicast.js
+# TypeError: Object #<an EventEmitter> has no method 'cwd'
+test-chdir.js
+
+# Error: ECONNREFUSED, Could not contact DNS servers
+test-c-ares.js
+test-http-dns-fail.js
+test-net-connect-timeout.js
+test-regress-GH-819.js
+
+# this is covered in other tests
+test-regression-object-prototype.js
+
+test-umask.js
+
+#**EXCEPTION: AssertionError: "first-priority-unsupported" ==
+#E/node    (31038):     at EventEmitter.<anonymous> (/data/data/com.android.browser/modules/proteus/test/simple/test-tls-npn-server-client.js:93:10)
+test-tls-npn-server-client.js
+
+# this puts a global.punycode which affects other tests
+test-punycode.js
+
+# FIXME - watchers are not cleaned up
+test-http-set-trailers.js
+test-http-upgrade-server2.js
+test-http-exceptions.js
+test-eio-race.js
+
+# AssertionError: ["A","B"] deepEqual ["A","B","C"]
+test-next-tick-errors.js
+
+# FIXME: AssertionError: {} === {}
+#    at testInjectFakeNativeModule (/local/mnt/workspace/ics/external/node/test/simple/test-require-cache.js:42:10)
+test-require-cache.js
+
+# run these tests independantly and not along with other tests since these have dependancies (e.g. http socket open)
+# ultimately we need to fix the bug why the tests dont cleanup the watchers..
+^test-tls-set-encoding.js
+^test-tls-request-timeout.js
+^test-tcp-wrap-listen.js
+^test-stream-pipe-cleanup.js
+
+# takes too long to run
+test-http-many-keep-alive-connections.js
+
+# zlib removed, unused
+test-zlib-from-gzip.js

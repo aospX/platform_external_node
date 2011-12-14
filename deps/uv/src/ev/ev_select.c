@@ -54,6 +54,13 @@
 # endif
 #endif
 
+// proteus: - even though NFDBITS is set, FD_MASK
+// seems to unavaiable on android, using FD_SET
+#if ANDROID
+#undef EV_SELECT_USE_FD_SET
+#define EV_SELECT_USE_FD_SET 1
+#endif
+
 #if EV_SELECT_IS_WINSOCKET
 # undef EV_SELECT_USE_FD_SET
 # define EV_SELECT_USE_FD_SET 1
@@ -266,7 +273,8 @@ select_poll (EV_P_ ev_tstamp timeout)
 #endif
 }
 
-int inline_size
+// proteus: Fix g++ warning
+inline_size int
 select_init (EV_P_ int flags)
 {
   backend_fudge  = 0.; /* posix says this is zero */
@@ -295,7 +303,8 @@ select_init (EV_P_ int flags)
   return EVBACKEND_SELECT;
 }
 
-void inline_size
+// proteus: Fix g++ warning
+inline_size void
 select_destroy (EV_P)
 {
   ev_free (vec_ri);

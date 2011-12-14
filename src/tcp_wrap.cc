@@ -37,19 +37,7 @@
 
 namespace node {
 
-using v8::Object;
-using v8::Handle;
-using v8::Local;
-using v8::Persistent;
-using v8::Value;
-using v8::HandleScope;
-using v8::FunctionTemplate;
-using v8::String;
-using v8::Function;
-using v8::TryCatch;
-using v8::Context;
-using v8::Arguments;
-using v8::Integer;
+using namespace v8;
 
 static Persistent<Function> constructor;
 static size_t slab_used;
@@ -219,6 +207,10 @@ class TCPWrap {
       uv_close((uv_handle_t*) handle, OnClose);
       return;
     }
+   
+    // proteus: test-tcp-wrap-listen.js
+    Context::Scope context(wrap->object_->CreationContext());
+    NODE_ASSERT(Context::InContext());
 
     // Instanciate the client javascript object and handle.
     Local<Object> client_obj = constructor->NewInstance();
@@ -235,7 +227,7 @@ class TCPWrap {
 
     // Successful accept. Call the onconnection callback in JavaScript land.
     Local<Value> argv[1] = { client_obj };
-    MakeCallback(wrap->object_, "onconnection", 1, argv);
+    Node::MakeCallback(wrap->object_, "onconnection", 1, argv);
   }
 
   static Handle<Value> ReadStart(const Arguments& args) {
@@ -280,6 +272,10 @@ class TCPWrap {
     assert(&wrap->handle_ == (uv_tcp_t*)handle);
 
     char* slab = NULL;
+   
+    // proteus: test-tcp-wrap-listen.js
+    Context::Scope context(wrap->object_->CreationContext());
+    NODE_ASSERT(Context::InContext());
 
     Handle<Object> global = Context::GetCurrent()->Global();
     Local<Value> slab_v = global->GetHiddenValue(slab_sym);
@@ -323,6 +319,10 @@ class TCPWrap {
     // uv_close() on the handle. Since we've destroyed object_ at the same
     // time as calling uv_close() we can test for this here.
     assert(wrap->object_.IsEmpty() == false);
+   
+    // proteus: test-tcp-wrap-listen.js
+    Context::Scope context(wrap->object_->CreationContext());
+    NODE_ASSERT(Context::InContext());
 
     // Remove the reference to the slab to avoid memory leaks;
     Local<Value> slab_v = wrap->object_->GetHiddenValue(slab_sym);
@@ -335,7 +335,7 @@ class TCPWrap {
       }
 
       SetErrno(uv_last_error().code);
-      MakeCallback(wrap->object_, "onread", 0, NULL);
+      Node::MakeCallback(wrap->object_, "onread", 0, NULL);
       return;
     }
 
@@ -351,7 +351,7 @@ class TCPWrap {
         Integer::New(wrap->slab_offset_),
         Integer::New(nread)
       };
-      MakeCallback(wrap->object_, "onread", 3, argv);
+      Node::MakeCallback(wrap->object_, "onread", 3, argv);
     }
   }
 
@@ -381,6 +381,10 @@ class TCPWrap {
 
     // The request object should still be there.
     assert(req_wrap->object_.IsEmpty() == false);
+   
+    // proteus: test-tcp-wrap-listen.js
+    Context::Scope context(req_wrap->object_->CreationContext());
+    NODE_ASSERT(Context::InContext());
 
     if (status) {
       SetErrno(uv_last_error().code);
@@ -395,7 +399,7 @@ class TCPWrap {
       req_wrap->object_->GetHiddenValue(buffer_sym),
     };
 
-    MakeCallback(req_wrap->object_, "oncomplete", 4, argv);
+    Node::MakeCallback(req_wrap->object_, "oncomplete", 4, argv);
 
     delete req_wrap;
   }
@@ -464,7 +468,7 @@ class TCPWrap {
       Local<Value>::New(req_wrap->object_)
     };
 
-    MakeCallback(req_wrap->object_, "oncomplete", 3, argv);
+    Node::MakeCallback(req_wrap->object_, "oncomplete", 3, argv);
 
     delete req_wrap;
   }
@@ -542,7 +546,7 @@ class TCPWrap {
       Local<Value>::New(req_wrap->object_)
     };
 
-    MakeCallback(req_wrap->object_, "oncomplete", 3, argv);
+    Node::MakeCallback(req_wrap->object_, "oncomplete", 3, argv);
 
     delete req_wrap;
   }

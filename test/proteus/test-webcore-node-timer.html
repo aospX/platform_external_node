@@ -1,0 +1,20 @@
+<script>
+function onLoad() {
+  console.log('Test STARTED : ' + 'test-webcore-node-timer.js');
+  nodejs(true);
+
+  try {
+    var module = navigator.loadModule('test-webcore-node-timer.js');
+    var count = 0;
+    setInterval(function() {
+        console.log("** Browser Timer fired");
+        if (count++ == 5) {
+           module.browserTimerFired = true;
+        }
+      }, 5);
+  } catch (e) {
+    test.fail(e.toString());
+  }
+}
+</script>
+<body onload='onLoad()'></body>

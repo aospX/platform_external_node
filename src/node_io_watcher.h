@@ -22,6 +22,7 @@
 #ifndef NODE_IO_H_
 #define NODE_IO_H_
 
+#include <node.h>
 #include <node_object_wrap.h>
 #include <ev.h>
 
@@ -57,6 +58,7 @@ class IOWatcher : ObjectWrap {
   void Stop();
 
   ev_io watcher_;
+  Node* m_node;
 };
 
 }  // namespace node

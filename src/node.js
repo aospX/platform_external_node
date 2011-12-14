@@ -1,4 +1,5 @@
 // Copyright Joyent, Inc. and other Node contributors.
+// Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the
@@ -24,106 +25,111 @@
 // This file is invoked by node::Load in src/node.cc, and responsible for
 // bootstrapping the node.js core. Special caution is given to the performance
 // of the startup process, so many dependencies are invoked lazily.
+// REQ: An object named "process" will be exposed in module scope which carries any global information across modules
 (function(process) {
   global = this;
 
   function startup() {
+    process.versions = {};
+    process.versions.openssl = "1.0.0e"; //ics
+    startup.globalConsole();
+    console.verbose("node.js: startup()");
 
-    if (process.env.NODE_USE_UV == '1') process.useUV = true;
+    // proteus: pull in https://github.com/joyent/node/commit/4ef8f06fe62edb74fded0e817266cb6398e69f36
+    var EventEmitter = NativeModule.require('events').EventEmitter;
+    process.__proto__ = EventEmitter.prototype;
+    process.EventEmitter = EventEmitter; // process.EventEmitter is deprecated
 
     startup.globalVariables();
     startup.globalTimeouts();
-    startup.globalConsole();
 
     startup.processAssert();
     startup.processNextTick();
-    startup.processStdio();
     startup.processKillAndExit();
     startup.processSignalHandlers();
 
-    startup.processChannel();
+    // freeze builtins
+    // REQ: All builtin objects in node context will be immutable (Object.freeze(Object) ..)
+    Object.freeze(Object);
+    Object.freeze(Object);
+    Object.freeze(Object.prototype);
+    Object.freeze(String);
+    Object.freeze(String.prototype);
+    Object.freeze(Function);
+    Object.freeze(Function.prototype);
+    Object.freeze(Array);
+    Object.freeze(Array.prototype);
+    Object.freeze(Boolean);
+    Object.freeze(Boolean.prototype);
+    Object.freeze(Math);
+    Object.freeze(Date);
+    Object.freeze(Date.prototype);
+    Object.freeze(RegExp);
+    Object.freeze(RegExp.prototype);
 
-    startup.removedMethods();
+    // FIXME: This causes wierd crash on the device
+    // Object.freeze(test);
 
-    startup.resolveArgv0();
+    // we cannot freeze process object, since events module writes to it
+    // this._events[type] = [] (this == process)
 
-    // There are various modes that Node can run in. The most common two
-    // are running from a script and running the REPL - but there are a few
-    // others like the debugger or running --eval arguments. Here we decide
-    // which mode we run in.
+    var Module = NativeModule.require('module');
+    var proteusModLoader = Module._load('proteusModLoader', null);
+    var loadModule = function(request, successCB, errorCB) {
+      console.info("loadModule: " + request);
 
-    if (NativeModule.exists('_third_party_main')) {
-      // To allow people to extend Node in different ways, this hook allows
-      // one to drop a file lib/_third_party_main.js into the build
-      // directory which will be executed instead of Node's normal loading.
-      process.nextTick(function() {
-        NativeModule.require('_third_party_main');
-      });
-
-    } else if (process.argv[1] == 'debug') {
-      // Start the debugger agent
-      var d = NativeModule.require('_debugger');
-      d.start();
-
-    } else if (process.argv[1]) {
-      // make process.argv[1] into a full path
-      if (!(/^http:\/\//).exec(process.argv[1])) {
-        var path = NativeModule.require('path');
-        process.argv[1] = path.resolve(process.argv[1]);
+      if (typeof errorCB !== 'function') {
+        errorCB = function(e) {
+          console.error("error in loadModule: " + e);
+          //throw e;
+        }
       }
 
-      var Module = NativeModule.require('module');
-      // REMOVEME: nextTick should not be necessary. This hack to get
-      // test/simple/test-exception-handler2.js working.
-      // Main entry point into most programs:
-      process.nextTick(Module.runMain);
-
-    } else if (process._eval != null) {
-      // User passed '-e' or '--eval' arguments to Node.
-      var Module = NativeModule.require('module');
-      var path = NativeModule.require('path');
-      var cwd = process.cwd();
-
-      var module = new Module('eval');
-      module.filename = path.join(cwd, 'eval');
-      module.paths = Module._nodeModulePaths(cwd);
-      var rv = module._compile('return eval(process._eval)', 'eval');
-      console.log(rv);
-
-    } else {
-      var binding = process.binding('stdio');
-      var fd = binding.openStdin();
-      var Module = NativeModule.require('module');
-
-      if (NativeModule.require('tty').isatty(fd)) {
-        // REPL
-        Module.requireRepl().start();
-
-      } else {
-        // Read all of stdin - execute it.
-        process.stdin.resume();
-        process.stdin.setEncoding('utf8');
-
-        var code = '';
-        process.stdin.on('data', function(d) {
-          code += d;
-        });
-
-        process.stdin.on('end', function() {
-          new Module()._compile(code, '[stdin]');
-        });
+      if (typeof request !== 'string' || typeof successCB != 'function') {
+        console.error("request: " + request + " successCB: " + successCB);
+        return errorCB("Invalid arguments");
       }
+
+      var isValidLoadModulePath = /^\s*[\w-.]+\s*$/.test(request);
+      if (!isValidLoadModulePath) {
+        return errorCB("Invalid request: " + request);
+      }
+
+      // REQ: loadModule(foo) will lookup module named "public-foo" in the downloads directory
+      console.verbose("node.js, loadModule. calling Module._load, request = " + request);
+
+
+      var proteusModLoaderObj = new proteusModLoader();
+      proteusModLoaderObj.loadPackage('public-' + request, function(){
+	                             try {
+					    var module = Module._load('public-' + request, null);
+					    successCB(module);
+					  } catch (e) {
+					    errorCB(e);
+					  }
+	                             },
+				     function(e){
+					 errorCB(e);
+				     });
+    };
+
+    // expose loadModuleSync in the node context for service node case
+    global.loadModuleSync = function(path) {
+      return Module._load('public-' + path, null);
     }
+
+    // expose async loadModule as well in case modules want to use it
+    global.loadModule = loadModule;
+    return loadModule;
   }
 
   startup.globalVariables = function() {
-    global.process = process;
-    global.global = global;
-    global.GLOBAL = global;
-    global.root = global;
-    global.Buffer = NativeModule.require('buffer').Buffer;
+    GLOBAL = global; //sqlite_sync needs this and possibly other node modules
+    // expose Buffer on the process object which is not visible to untrusted code
+    process.Buffer = NativeModule.require('buffer').Buffer;
   };
 
+  // REQ: modules will use the 'node's' timeout implementation and not rely on browser (e.g. for setTimeout)
   startup.globalTimeouts = function() {
     global.setTimeout = function() {
       var t = NativeModule.require('timers');
@@ -198,79 +204,13 @@
     };
   };
 
-  startup.processStdio = function() {
-    var binding = process.binding('stdio'),
-        // FIXME Remove conditional when net is supported again on windows.
-        net = (process.platform !== "win32")
-              ? NativeModule.require('net')
-              : undefined,
-        fs = NativeModule.require('fs'),
-        tty = NativeModule.require('tty');
-
-    // process.stdout
-
-    var fd = binding.stdoutFD;
-
-    if (binding.isatty(fd)) {
-      process.stdout = new tty.WriteStream(fd);
-    } else if (binding.isStdoutBlocking()) {
-      process.stdout = new fs.WriteStream(null, {fd: fd});
-    } else {
-      process.stdout = new net.Stream(fd);
-      // FIXME Should probably have an option in net.Stream to create a
-      // stream from an existing fd which is writable only. But for now
-      // we'll just add this hack and set the `readable` member to false.
-      // Test: ./node test/fixtures/echo.js < /etc/passwd
-      process.stdout.readable = false;
-    }
-
-    // process.stderr
-
-    var events = NativeModule.require('events');
-    var stderr = process.stderr = new events.EventEmitter();
-    stderr.writable = true;
-    stderr.readable = false;
-    stderr.write = process.binding('stdio').writeError;
-    stderr.end = stderr.destroy = stderr.destroySoon = function() { };
-
-    // process.stdin
-
-    var fd = binding.openStdin();
-
-    if (binding.isatty(fd)) {
-      process.stdin = new tty.ReadStream(fd);
-    } else if (binding.isStdinBlocking()) {
-      process.stdin = new fs.ReadStream(null, {fd: fd});
-    } else {
-      process.stdin = new net.Stream(fd);
-      process.stdin.readable = true;
-    }
-
-    process.openStdin = function() {
-      process.stdin.resume();
-      return process.stdin;
-    };
-  };
-
   startup.processKillAndExit = function() {
     process.exit = function(code) {
       process.emit('exit', code || 0);
       process.reallyExit(code || 0);
     };
 
-    process.kill = function(pid, sig) {
-      // preserve null signal
-      if (0 === sig) {
-        process._kill(pid, 0);
-      } else {
-        sig = sig || 'SIGTERM';
-        if (startup.lazyConstants()[sig]) {
-          process._kill(pid, startup.lazyConstants()[sig]);
-        } else {
-          throw new Error('Unknown signal: ' + sig);
-        }
-      }
-    };
+    // proteus - kill not supported
   };
 
   startup.processSignalHandlers = function() {
@@ -278,6 +218,10 @@
     // process.addListener.
     var events = NativeModule.require('events');
     var signalWatchers = {};
+
+    // \proteus\ addListener here points to EventEmitter's addListener, since __proto__
+    // of process maps to EventEmitters prototype (same as doing process = new EventEmitter())
+    // so, this essentially says process is a eventEmitter
     var addListener = process.addListener;
     var removeListener = process.removeListener;
 
@@ -319,59 +263,6 @@
   };
 
 
-  startup.processChannel = function() {
-    // If we were spawned with env NODE_CHANNEL_FD then load that up and
-    // start parsing data from that stream.
-    if (process.env.NODE_CHANNEL_FD) {
-      var fd = parseInt(process.env.NODE_CHANNEL_FD);
-      assert(fd >= 0);
-      var cp = NativeModule.require('child_process');
-      cp._forkChild(fd);
-      assert(process.send);
-    }
-  }
-
-  startup._removedProcessMethods = {
-    'assert': 'process.assert() use require("assert").ok() instead',
-    'debug': 'process.debug() use console.error() instead',
-    'error': 'process.error() use console.error() instead',
-    'watchFile': 'process.watchFile() has moved to fs.watchFile()',
-    'unwatchFile': 'process.unwatchFile() has moved to fs.unwatchFile()',
-    'mixin': 'process.mixin() has been removed.',
-    'createChildProcess': 'childProcess API has changed. See doc/api.txt.',
-    'inherits': 'process.inherits() has moved to sys.inherits.',
-    '_byteLength': 'process._byteLength() has moved to Buffer.byteLength',
-  };
-
-  startup.removedMethods = function() {
-    for (var method in startup._removedProcessMethods) {
-      var reason = startup._removedProcessMethods[method];
-      process[method] = startup._removedMethod(reason);
-    }
-  };
-
-  startup._removedMethod = function(reason) {
-    return function() {
-      throw new Error(reason);
-    };
-  };
-
-  startup.resolveArgv0 = function() {
-    var cwd = process.cwd();
-    var isWindows = process.platform === 'win32';
-
-    // Make process.argv[0] into a full path, but only touch argv[0] if it's
-    // not a system $PATH lookup.
-    // TODO: Make this work on Windows as well.  Note that "node" might
-    // execute cwd\node.exe, or some %PATH%\node.exe on Windows,
-    // and that every directory has its own cwd, so d:node.exe is valid.
-    var argv0 = process.argv[0];
-    if (!isWindows && argv0.indexOf('/') !== -1 && argv0.charAt(0) !== '/') {
-      var path = NativeModule.require('path');
-      process.argv[0] = path.join(cwd, process.argv[0]);
-    }
-  };
-
   // Below you find a minimal module system, which is used to load the node
   // core modules found in lib/*.js. All core modules are compiled into the
   // node binary, so they can be loaded faster.
@@ -379,19 +270,12 @@
   var Script = process.binding('evals').NodeScript;
   var runInThisContext = Script.runInThisContext;
 
-  // A special hook to test the new platform layer. Use the command-line
-  // flag --use-uv to enable the libuv backend instead of the legacy
-  // backend.
   function translateId(id) {
     switch (id) {
       case 'net':
-        return process.useUV ? 'net_uv' : 'net_legacy';
-
       case 'timers':
-        return process.useUV ? 'timers_uv' : 'timers_legacy';
-
       case 'dns':
-        return process.useUV ? 'dns_uv' : 'dns_legacy';
+        return id + '_legacy';
 
       default:
         return id;
@@ -430,8 +314,18 @@
     nativeModule.compile();
     nativeModule.cache();
 
+    // console itself is loaded with require
+    if (typeof console == 'undefined') {
+      process.log(3, "loaded core js module (" + id + ")");
+    } else {
+      console.debug("loaded core js module (" + id + ")");
+    }
+
     return nativeModule.exports;
   };
+
+  // expose the type of require exported in the current module, for debugging
+  NativeModule.require.type = "NativeModule.require";
 
   NativeModule.getCached = function(id) {
     id = translateId(id);
@@ -453,7 +347,7 @@
   };
 
   NativeModule.wrapper = [
-    '(function (exports, require, module, __filename, __dirname, define) { ',
+    '(function (process, exports, require, module, __filename, __dirname, Buffer) { ',
     '\n});'
   ];
 
@@ -462,7 +356,9 @@
     source = NativeModule.wrap(source);
 
     var fn = runInThisContext(source, this.filename, true);
-    fn(this.exports, NativeModule.require, this, this.filename);
+    // proteus, pass process as a parameter in closure so that trusted modules can access it,
+    // but the global/user space dont have access
+    fn(process, this.exports, NativeModule.require, this, this.filename, undefined, process.Buffer);
 
     this.loaded = true;
   };
@@ -471,5 +367,5 @@
     NativeModule._cache[this.id] = this;
   };
 
-  startup();
+  return startup();
 });

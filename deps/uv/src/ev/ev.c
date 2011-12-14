@@ -196,6 +196,9 @@ EV_CPP(extern "C" {)
 # undef EV_AVOID_STDIO
 #endif
 
+//proteus
+#include "nodelog.h"
+
 /* OS X, in its infinite idiocy, actually HARDCODES
  * a limit of 1024 into their select. Where people have brains,
  * OS X engineers apparently have a vacuum. Or maybe they were
@@ -713,7 +716,6 @@ typedef struct
 #endif
 
 #if EV_MULTIPLICITY
-
   struct ev_loop
   {
     ev_tstamp ev_rt_now;
@@ -842,7 +844,8 @@ array_nextsize (int elem, int cur, int cnt)
   while (cnt > ncur);
 
   /* if size is large, round to MALLOC_ROUND - 4 * longs to accomodate malloc overhead */
-  if (elem * ncur > MALLOC_ROUND - sizeof (void *) * 4)
+  // proteus: Fix g++ warning
+  if (elem * ncur > (int ) (MALLOC_ROUND - sizeof (void *) * 4))
     {
       ncur *= elem;
       ncur = (ncur + elem + (MALLOC_ROUND - 1) + sizeof (void *) * 4) & ~(MALLOC_ROUND - 1);
@@ -1560,7 +1563,8 @@ ev_version_minor (void)
 }
 
 /* return true if we are running with elevated privileges and should ignore env variables */
-int inline_size
+// proteus: Fix g++ warning
+inline_size int
 enable_secure (void)
 {
 #ifdef _WIN32
@@ -2393,10 +2397,14 @@ ev_run (EV_P_ int flags)
 
   loop_done = EVBREAK_CANCEL;
 
+  NODE_LOGM("ev_run, before, activecnt = %d pendingcnt = %d", activecnt, ev_pending_count(EV_A));
+
   EV_INVOKE_PENDING; /* in case we recurse, ensure ordering stays nice and clean */
 
   do
     {
+      NODE_LOGM("ev_run, in, activecnt = %d", activecnt);
+
 #if EV_VERIFY >= 2
       ev_verify (EV_A);
 #endif
@@ -2550,6 +2558,11 @@ ev_unref (EV_P)
   --activecnt;
 }
 
+int
+ev_activecnt(EV_P) {
+  return activecnt;
+}
+
 void
 ev_now_update (EV_P)
 {
@@ -2671,7 +2684,8 @@ ev_io_start (EV_P_ ev_io *w)
   array_needsize (ANFD, anfds, anfdmax, fd + 1, array_init_zero);
   wlist_add (&anfds[fd].head, (WL)w);
 
-  fd_change (EV_A_ fd, w->events & EV__IOFDSET | EV_ANFD_REIFY);
+  // proteus: Fix g++ warning
+  fd_change (EV_A_ fd, w->events & (EV__IOFDSET | EV_ANFD_REIFY));
   w->events &= ~EV__IOFDSET;
 
   EV_FREQUENT_CHECK;
@@ -3900,8 +3914,9 @@ ev_walk (EV_P_ int types, void (*cb)(EV_P_ int type, void *w))
           wl = wn;
         }
 #endif
-/* EV_STAT     0x00001000 /* stat data changed */
-/* EV_EMBED    0x00010000 /* embedded event loop needs sweep */
+// proteus: Fix g++ warning
+/* EV_STAT     0x00001000  stat data changed */
+/* EV_EMBED    0x00010000  embedded event loop needs sweep */
 }
 #endif
 

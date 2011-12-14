@@ -823,6 +823,8 @@ void ev_async_send     (EV_P_ ev_async *w);
 
 #endif
 
+int ev_activecnt(EV_P);
+
 EV_CPP(})
 
 #endif

@@ -1,0 +1,6 @@
+{
+   "name": "proteusPackageExtractor",
+   "version": "0.0.1",
+   "description": "Package to extract CRX content",
+   "main": "./lib/proteusPackageExtractor.js"
+}

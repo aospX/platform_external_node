@@ -1,0 +1,56 @@
+<html>
+<head>
+<script type="text/javascript">
+    var permission;
+
+    navigator.loadModule('test', function(testmod){
+    permission = testmod.require('permission');
+	});
+
+	function privFeat()
+	{
+		var list = permission.privilegedFeatures;
+		document.getElementById("privFeat").innerHTML = list[0]+list[1];
+	}
+
+	// Test func for permissionLevel API
+	function currPermission()
+	{
+		document.getElementById("permLvl").innerHTML = permission.permissionLevel("camera");
+	}
+
+	// Test func for requestPermission API
+	function permCB(permission)
+	{
+	    console.log('Inside APP callback');
+		document.getElementById("reqPerm").innerHTML=permission;
+		console.log('returning');
+	}
+
+	function reqPermission()
+	{
+		var myfeatures = [];
+		myfeatures[0]="audio";
+		myfeatures[1]="geolocation";
+		myfeatures[2]="camera";
+		permission.requestPermission(myfeatures,permCB);
+	}
+
+</script>
+</head>
+
+<body>
+    <h1>My First Web Page</h1>
+
+    <p id="privFeat">Test privilegeFeatures()</p>
+    <button type="button" onclick="privFeat()">Display Features</button>
+
+    <p id="permLvl">Test permissionLevel()</p>
+    <button type="button" onclick="currPermission()">Display Permission</button>
+
+    <p id="reqPerm">Test requestPermission()</p>
+    <button type="button" onclick="reqPermission()">Request Permission</button>
+
+</body>
+</html>
+

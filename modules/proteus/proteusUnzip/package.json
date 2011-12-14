@@ -1,0 +1,6 @@
+{
+   "name": "proteusUnzip",
+   "version": "0.0.1",
+   "description": "Package to unzip folders",
+   "main": "./lib/proteusUnzip.js"
+}

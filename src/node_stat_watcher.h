@@ -23,19 +23,19 @@
 #define NODE_STAT_WATCHER_H_
 
 #include <node.h>
-#include <node_events.h>
 #include <ev.h>
 
 namespace node {
 
-class StatWatcher : EventEmitter {
+// proteus: pull in 0a3fc1d9c8becc32c63ae736ca2b3719a3d03c5b
+class StatWatcher : ObjectWrap {
  public:
   static void Initialize(v8::Handle<v8::Object> target);
 
  protected:
   static v8::Persistent<v8::FunctionTemplate> constructor_template;
 
-  StatWatcher() : EventEmitter() {
+  StatWatcher() : ObjectWrap() {
     persistent_ = false;
     path_ = NULL;
     ev_init(&watcher_, StatWatcher::Callback);

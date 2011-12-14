@@ -135,7 +135,7 @@ static const CachedPower kCachedPowers[] = {
 
 static const int kCachedPowersLength = ARRAY_SIZE(kCachedPowers);
 static const int kCachedPowersOffset = -kCachedPowers[0].decimal_exponent;
-static const double kD_1_LOG2_10 = 0.30102999566398114;  //  1 / lg(10)
+static const double kD_1_LOGD_10 = 0.30102999566398114;  //  1 / lg(10)
 const int PowersOfTenCache::kDecimalExponentDistance =
     kCachedPowers[1].decimal_exponent - kCachedPowers[0].decimal_exponent;
 const int PowersOfTenCache::kMinDecimalExponent =
@@ -151,7 +151,7 @@ void PowersOfTenCache::GetCachedPowerForBinaryExponentRange(
   int kQ = DiyFp::kSignificandSize;
   // Some platforms return incorrect sign on 0 result. We can ignore that here,
   // which means we can avoid depending on platform.h.
-  double k = ceil((min_exponent + kQ - 1) * kD_1_LOG2_10);
+  double k = ceil((min_exponent + kQ - 1) * kD_1_LOGD_10);
   int foo = kCachedPowersOffset;
   int index =
       (foo + static_cast<int>(k) - 1) / kDecimalExponentDistance + 1;

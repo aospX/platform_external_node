@@ -104,6 +104,10 @@ typedef int ares_socklen_t;
 #  include <netinet/in.h>
 #endif
 
+#ifdef ANDROID
+#include <sys/select.h>
+#endif
+
 #ifdef  __cplusplus
 extern "C" {
 #endif

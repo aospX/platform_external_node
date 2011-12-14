@@ -5,7 +5,6 @@ tags
 *.pyc
 doc/api.xml
 tools/nodejs.pc
-tmp/
 node
 node_g
 *.swp

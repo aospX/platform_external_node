@@ -37,7 +37,8 @@ import re
 import sys
 import string
 
-sys.path.append(dirname(__file__) + "/../deps/v8/tools");
+#proteus - pickup local jsmin.py instead of from v8 to avoid conflicts with default v8
+#sys.path.append(dirname(__file__) + "/../deps/v8/tools");
 import jsmin
 
 
@@ -209,7 +210,7 @@ def ReadMacros(lines):
           raise ("Illegal line: " + line)
   return (constants, macros)
 
-
+# proteus: fix g++ warning, add a null to sentinel
 HEADER_TEMPLATE = """\
 #ifndef node_natives_h
 #define node_natives_h
@@ -227,7 +228,7 @@ static const struct _native natives[] = {
 
 %(native_lines)s\
 
-  { NULL, NULL } /* sentinel */
+  { NULL, NULL, NULL } /* sentinel */
 
 };
 

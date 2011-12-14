@@ -45,6 +45,10 @@
 # endif
 #endif  // __OpenBSD__
 
+#ifdef ANDROID
+#include <nameser.h>
+#endif
+
 /*
  * HACK to use inet_pton/inet_ntop from c-ares because mingw32 doesn't have it
  * This trick is used in node_net.cc as well
@@ -111,6 +115,25 @@ static Persistent<String> name_symbol;
 static Persistent<String> callback_symbol;
 static Persistent<String> exchange_symbol;
 
+// proteus: FIXME, tie up with module life cycle
+static inline v8::Persistent<v8::Function>* cb_persist(
+    const v8::Local<v8::Value> &v) {
+  v8::Persistent<v8::Function> *fn = new v8::Persistent<v8::Function>();
+  *fn = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(v));
+  return fn;
+}
+
+static inline v8::Persistent<v8::Function>* cb_unwrap(void *data) {
+  v8::Persistent<v8::Function> *cb =
+    reinterpret_cast<v8::Persistent<v8::Function>*>(data);
+  NODE_ASSERT((*cb)->IsFunction());
+  return cb;
+}
+
+static inline void cb_destroy(v8::Persistent<v8::Function> * cb) {
+  cb->Dispose();
+  delete cb;
+}
 
 void Cares::Initialize(Handle<Object> target) {
   HandleScope scope;
@@ -241,10 +264,10 @@ static void ResolveError(Persistent<Function> &cb, int status) {
 
   TryCatch try_catch;
 
-  cb->Call(v8::Context::GetCurrent()->Global(), 1, &e);
+  cb->Call(cb->CreationContext()->Global(), 1, &e);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 
@@ -269,10 +292,10 @@ static void HostByNameCb(void *data,
 
   Local<Value> argv[2] = { Local<Value>::New(Null()), addresses};
 
-  (*cb)->Call(v8::Context::GetCurrent()->Global(), 2, argv);
+  (*cb)->Call((*cb)->CreationContext()->Global(), 2, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 
   cb_destroy(cb);
@@ -299,10 +322,10 @@ static void HostByAddrCb(void *data,
 
   Local<Value> argv[2] = { Local<Value>::New(Null()), names };
 
-  (*cb)->Call(v8::Context::GetCurrent()->Global(), 2, argv);
+  (*cb)->Call((*cb)->CreationContext()->Global(), 2, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 
   cb_destroy(cb);
@@ -312,10 +335,10 @@ static void HostByAddrCb(void *data,
 static void cb_call(Persistent<Function> &cb, int argc, Local<Value> *argv) {
   TryCatch try_catch;
 
-  cb->Call(v8::Context::GetCurrent()->Global(), argc, argv);
+  cb->Call(cb->CreationContext()->Global(), argc, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 
@@ -509,8 +532,10 @@ void Channel::QueryCb(void *arg,
 void Channel::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Channel::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(Channel::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Channel"));
 
@@ -528,7 +553,7 @@ void Channel::Initialize(Handle<Object> target) {
 
 Handle<Value> Channel::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
@@ -802,7 +827,7 @@ void Channel::SockStateCb(void *data, ares_socket_t sock, int read, int write) {
   callback->Call(c->handle_, 3, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 

@@ -33,20 +33,7 @@
 
 namespace node {
 
-using v8::Object;
-using v8::Handle;
-using v8::Local;
-using v8::Persistent;
-using v8::Value;
-using v8::HandleScope;
-using v8::FunctionTemplate;
-using v8::String;
-using v8::Function;
-using v8::TryCatch;
-using v8::Context;
-using v8::Arguments;
-using v8::Integer;
-
+using namespace v8;
 
 class TimerWrap {
  public:
@@ -223,7 +210,7 @@ class TimerWrap {
     wrap->StateChange();
 
     Local<Value> argv[1] = { Integer::New(status) };
-    MakeCallback(wrap->object_, "ontimeout", 1, argv);
+    Node::MakeCallback(wrap->object_, "ontimeout", 1, argv);
   }
 
   uv_timer_t handle_;

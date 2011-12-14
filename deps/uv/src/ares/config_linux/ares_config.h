@@ -53,10 +53,12 @@
 #define HAVE_ARPA_INET_H 1
 
 /* Define to 1 if you have the <arpa/nameser_compat.h> header file. */
+#ifndef ANDROID
 #define HAVE_ARPA_NAMESER_COMPAT_H 1
 
 /* Define to 1 if you have the <arpa/nameser.h> header file. */
 #define HAVE_ARPA_NAMESER_H 1
+#endif
 
 /* Define to 1 if you have the <assert.h> header file. */
 #define HAVE_ASSERT_H 1
@@ -116,7 +118,9 @@
 #define HAVE_GETNAMEINFO 1
 
 /* Define to 1 if you have the getservbyport_r function. */
+#ifndef ANDROID
 #define HAVE_GETSERVBYPORT_R 1
+#endif
 
 /* Define to 1 if you have the `gettimeofday' function. */
 #define HAVE_GETTIMEOFDAY 1
@@ -140,7 +144,9 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the ioctl function. */
+#ifndef ANDROID
 #define HAVE_IOCTL 1
+#endif
 
 /* Define to 1 if you have the ioctlsocket function. */
 /* #undef HAVE_IOCTLSOCKET */
@@ -174,7 +180,9 @@
 #define HAVE_LONGLONG 1
 
 /* Define to 1 if you have the malloc.h header file. */
+#ifndef ANDROID
 #define HAVE_MALLOC_H 1
+#endif
 
 /* Define to 1 if you have the memory.h header file. */
 #define HAVE_MEMORY_H 1
@@ -306,7 +314,9 @@
 #define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <sys/uio.h> header file. */
+#ifndef ANDROID
 #define HAVE_SYS_UIO_H 1
+#endif
 
 /* Define to 1 if you have the <time.h> header file. */
 #define HAVE_TIME_H 1

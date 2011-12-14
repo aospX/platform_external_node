@@ -23,6 +23,7 @@
 
 #include <node.h>
 #include <v8.h>
+//#include <node_private.h>
 
 #include <assert.h>
 
@@ -37,8 +38,10 @@ Persistent<String> callback_symbol;
 void IOWatcher::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(IOWatcher::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(IOWatcher::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("IOWatcher"));
 
@@ -57,6 +60,11 @@ void IOWatcher::Callback(EV_P_ ev_io *w, int revents) {
   assert(w == &io->watcher_);
   HandleScope scope;
 
+  NODE_LOGM("io_watcher response (%p)", w);
+  // proteus: This is required since the exception doesnt have a context
+  // FIXME: deriving context from try_catch?
+ // Context::Scope cscope(io->context_);
+
   Local<Value> callback_v = io->handle_->Get(callback_symbol);
   if (!callback_v->IsFunction()) {
     io->Stop();
@@ -74,7 +82,7 @@ void IOWatcher::Callback(EV_P_ ev_io *w, int revents) {
   callback->Call(io->handle_, 2, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 }
 
@@ -87,12 +95,13 @@ void IOWatcher::Callback(EV_P_ ev_io *w, int revents) {
 //
 Handle<Value> IOWatcher::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
   IOWatcher *s = new IOWatcher();
   s->Wrap(args.This());
+
   return args.This();
 }
 
@@ -115,6 +124,7 @@ Handle<Value> IOWatcher::Stop(const Arguments& args) {
 
 void IOWatcher::Start() {
   if (!ev_is_active(&watcher_)) {
+    NODE_LOGM("io_watcher start (%p)", &watcher_);
     ev_io_start(EV_DEFAULT_UC_ &watcher_);
     Ref();
   }
@@ -123,6 +133,7 @@ void IOWatcher::Start() {
 
 void IOWatcher::Stop() {
   if (ev_is_active(&watcher_)) {
+    NODE_LOGM("io_watcher stop (%p)", &watcher_);
     ev_io_stop(EV_DEFAULT_UC_ &watcher_);
     Unref();
   }

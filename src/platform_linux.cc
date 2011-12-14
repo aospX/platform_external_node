@@ -25,7 +25,11 @@
 #include <v8.h>
 
 #include <sys/param.h> // for MAXPATHLEN
+
+#ifndef ANDROID
 #include <sys/sysctl.h>
+#endif
+
 #include <sys/sysinfo.h>
 #include <unistd.h> // getpagesize, sysconf
 #include <stdio.h> // sscanf, snprintf
@@ -39,7 +43,11 @@
 /* GetInterfaceAddresses */
 #include <arpa/inet.h>
 #include <sys/types.h>
+
+#ifndef ANDROID
 #include <ifaddrs.h>
+#endif
+
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -67,7 +75,11 @@ void Platform::SetProcessTitle(char *title) {
 #ifdef PR_SET_NAME
   if (process_title) free(process_title);
   process_title = strdup(title);
+#ifdef ANDROID
+  prctl(PR_SET_NAME, (unsigned long)process_title, 0, 0, 0);
+#else
   prctl(PR_SET_NAME, process_title);
+#endif
 #else
   Local<Value> ex = Exception::Error(
     String::New("'process.title' is not writable on your system, sorry."));
@@ -309,15 +321,19 @@ int Platform::GetLoadAvg(Local<Array> *loads) {
   return 0;
 }
 
-
+#ifndef ANDROID
 bool IsInternal(struct ifaddrs* addr) {
   return addr->ifa_flags & IFF_UP &&
          addr->ifa_flags & IFF_RUNNING &&
          addr->ifa_flags & IFF_LOOPBACK;
 }
+#endif
 
 
 Handle<Value> Platform::GetInterfaceAddresses() {
+#ifdef ANDROID
+  return v8::Undefined();
+#else
   HandleScope scope;
   struct ::ifaddrs *addrs, *ent;
   struct ::sockaddr_in *in4;
@@ -384,7 +400,7 @@ Handle<Value> Platform::GetInterfaceAddresses() {
   freeifaddrs(addrs);
 
   return scope.Close(ret);
+#endif
 }
-
 
 }  // namespace node

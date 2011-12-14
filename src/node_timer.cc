@@ -38,8 +38,11 @@ static Persistent<String> callback_symbol;
 void Timer::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Timer::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(Timer::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
+
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Timer"));
 
@@ -100,10 +103,11 @@ void Timer::OnTimeout(EV_P_ ev_timer *watcher, int revents) {
 
   TryCatch try_catch;
 
+  NODE_LOGI("%s, Timer fire (%p)",__FUNCTION__, &watcher);
   callback->Call(timer->handle_, 0, NULL);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 
   if (timer->watcher_.repeat == 0) timer->Unref();
@@ -112,12 +116,13 @@ void Timer::OnTimeout(EV_P_ ev_timer *watcher, int revents) {
 
 Timer::~Timer() {
   ev_timer_stop(EV_DEFAULT_UC_ &watcher_);
+  NODE_LOGI("%s, Timer stop (%p)",__FUNCTION__, &watcher_);
 }
 
 
 Handle<Value> Timer::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
@@ -147,6 +152,7 @@ Handle<Value> Timer::Start(const Arguments& args) {
   ev_now_update(EV_DEFAULT_UC);
 
   ev_timer_start(EV_DEFAULT_UC_ &timer->watcher_);
+  NODE_LOGI("%s, Timer start (%p)",__FUNCTION__, &timer->watcher_);
 
   if (!was_active) timer->Ref();
 
@@ -165,6 +171,7 @@ Handle<Value> Timer::Stop(const Arguments& args) {
 void Timer::Stop() {
   if (watcher_.active) {
     ev_timer_stop(EV_DEFAULT_UC_ &watcher_);
+    NODE_LOGI("%s, Timer stop (%p)",__FUNCTION__, &watcher_);
     Unref();
   }
 }
@@ -198,3 +205,4 @@ Handle<Value> Timer::Again(const Arguments& args) {
 
 
 }  // namespace node
+//

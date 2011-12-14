@@ -35,8 +35,10 @@ extern "C" {
 
 #include "ares.h"
 
+#ifndef ANDROID
 #ifndef _SSIZE_T_
 typedef intptr_t ssize_t;
+#endif
 #endif
 
 typedef struct uv_err_s uv_err_t;
@@ -52,7 +54,7 @@ typedef struct uv_async_s uv_async_t;
 typedef struct uv_getaddrinfo_s uv_getaddrinfo_t;
 
 
-#if defined(__unix__) || defined(__POSIX__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__POSIX__) || defined(__APPLE__) || defined(ANDROID)
 # include "uv-unix.h"
 #else
 # include "uv-win.h"
@@ -484,6 +486,7 @@ typedef struct {
   uint64_t idle_init;
   uint64_t async_init;
   uint64_t timer_init;
+  uint64_t io_init; // proteus
 } uv_counters_t;
 
 uv_counters_t* uv_counters();

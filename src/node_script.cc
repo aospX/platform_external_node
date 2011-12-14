@@ -25,23 +25,7 @@
 
 namespace node {
 
-using v8::Context;
-using v8::Script;
-using v8::Value;
-using v8::Handle;
-using v8::HandleScope;
-using v8::Object;
-using v8::Arguments;
-using v8::ThrowException;
-using v8::TryCatch;
-using v8::String;
-using v8::Exception;
-using v8::Local;
-using v8::Array;
-using v8::Persistent;
-using v8::Integer;
-using v8::FunctionTemplate;
-
+using namespace v8;
 
 class WrappedContext : ObjectWrap {
  public:
@@ -101,8 +85,11 @@ class WrappedScript : ObjectWrap {
 void WrappedContext::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(WrappedContext::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(WrappedContext::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
+
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Context"));
 
@@ -153,8 +140,11 @@ Persistent<FunctionTemplate> WrappedScript::constructor_template;
 void WrappedScript::Initialize(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(WrappedScript::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
+  if (constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> t = FunctionTemplate::New(WrappedScript::New);
+    constructor_template = Persistent<FunctionTemplate>::New(t);
+  }
+
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   // Note: We use 'NodeScript' instead of 'Script' so that we do not
   // conflict with V8's Script class defined in v8/src/messages.js
@@ -200,7 +190,7 @@ void WrappedScript::Initialize(Handle<Object> target) {
 
 Handle<Value> WrappedScript::New(const Arguments& args) {
   if (!args.IsConstructCall()) {
-    return FromConstructorTemplate(constructor_template, args);
+    return Node::FromConstructorTemplate(constructor_template, args);
   }
 
   HandleScope scope;
@@ -366,7 +356,7 @@ Handle<Value> WrappedScript::EvalMachine(const Arguments& args) {
                                          : Script::New(code, filename);
     if (script.IsEmpty()) {
       // FIXME UGLY HACK TO DISPLAY SYNTAX ERRORS.
-      if (display_error) DisplayExceptionLine(try_catch);
+      if (display_error) Node::DisplayExceptionLine(try_catch);
 
       // Hack because I can't get a proper stacktrace on SyntaxError
       return try_catch.ReThrow();

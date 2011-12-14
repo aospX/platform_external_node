@@ -51,12 +51,15 @@ exports.globalCheck = true;
 
 process.on('exit', function() {
   if (!exports.globalCheck) return;
+  if (global.window) {
+    console.log('no global leak checks for browser');
+    return;
+  }
   var knownGlobals = [setTimeout,
                       setInterval,
                       clearTimeout,
                       clearInterval,
                       console,
-                      Buffer,
                       process,
                       global];
 
@@ -73,11 +76,20 @@ process.on('exit', function() {
     knownGlobals.push(DTRACE_HTTP_SERVER_REQUEST);
     knownGlobals.push(DTRACE_HTTP_CLIENT_RESPONSE);
     knownGlobals.push(DTRACE_HTTP_CLIENT_REQUEST);
+  }
+
+  // proteus -add net also since for some tests (test-fs-read.js) only one is loaded
+  if (global.DTRACE_NET_SOCKET_WRITE) {
     knownGlobals.push(DTRACE_NET_STREAM_END);
     knownGlobals.push(DTRACE_NET_SERVER_CONNECTION);
     knownGlobals.push(DTRACE_NET_SOCKET_READ);
     knownGlobals.push(DTRACE_NET_SOCKET_WRITE);
   }
+
+  // proteus: add test on global object
+  knownGlobals.push(test);
+  knownGlobals.push(loadModule);
+  knownGlobals.push(loadModuleSync);
 
   for (var x in global) {
     var found = false;
@@ -90,8 +102,8 @@ process.on('exit', function() {
     }
 
     if (!found) {
-      console.error('Unknown global: %s', x);
-      assert.ok(false, 'Unknown global founded');
+      console.error('Unknown global: '+ x);
+      assert.ok(false, 'Unknown global founded - ' + x);
     }
   }
 });

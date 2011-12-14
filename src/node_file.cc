@@ -1,4 +1,5 @@
 // Copyright Joyent, Inc. and other Node contributors.
+// Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the
@@ -57,6 +58,7 @@
 namespace node {
 
 using namespace v8;
+using namespace std;
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -84,11 +86,115 @@ static inline bool SetCloseOnExec(int fd) {
 #endif
 }
 
+/////////////////////////////// FileNodeModule ///////////////////////////////////
+/* proteus:
+ * This class implements the module interface and is created for each 'fs module' in a node instance (page)
+ * i.e. if you do a require('fs') two times with different references, there would still be a single module
+ * when a new async request is done, the watcher (eio_req) is added to a list, and on completion removed
+ * if the node instance is released it would cancel all pending requests in the list
+ */
+class FileNodeModule : public NodeModule {
+  public:
+    FileNodeModule(Node *node) : m_node(node) {}
+    void HandleInternalEvent(InternalEvent *e);
+    Node *node() { return m_node; }
+    void add(eio_req* req);
+    void remove(eio_req* req);
+    ModuleId Module() { return MODULE_FS; }
+    void HandleWebKitEvent(WebKitEvent *e) {NODE_NI();}
+    void release();
+
+  private:
+    Node *m_node;
+    vector<eio_req*> m_eio_list;
+    void erase_(eio_req* req);
+};
+
+void FileNodeModule::HandleInternalEvent(InternalEvent *e) {
+  NODE_LOGW("%s,deprecated", __FUNCTION__);
+}
+
+void FileNodeModule::add(eio_req* req) {
+  NODE_LOGM("add eio_req %p", req);
+  m_eio_list.push_back(req);
+}
+
+void FileNodeModule::remove(eio_req* req) {
+  NODE_LOGM("remove eio_req %p", req);
+  erase_(req);
+}
+
+void FileNodeModule::erase_(eio_req* req) {
+  bool found = false;
+  for (vector<eio_req* >::iterator it = m_eio_list.begin();
+      it != m_eio_list.end(); it++)
+  {
+    if (*it == req) {
+      m_eio_list.erase(it);
+      found = true;
+      break;
+    }
+  }
+  NODE_ASSERT(found);
+}
+
+void FileNodeModule::release() {
+  NODE_LOGV("%s, module (%p), eio watchers = %d",
+      __FUNCTION__, this, m_eio_list.size());
+
+  for (vector<eio_req *>::iterator it = m_eio_list.begin();
+      it != m_eio_list.end(); it++)
+  {
+    // cancel pending request
+    NODE_LOGV("%s, eio_req being cancelled %p", __FUNCTION__, *it);
+    eio_cancel(*it);
+
+    // remove our reference from the uv
+    uv_unref();
+
+    // emit event for test purposes
+    m_node->EmitEvent("fsWatcherCancelled");
+  }
+  m_eio_list.clear();
+}
+
+/////////////////////////////// End of FileNodeModule ///////////////////////////////////
+
+/* proteus:
+ * This is the object passed as the data to the eio_request to retreive the state of the
+ * request (js callback, module, req ptr) in the eio callback
+ */
+class EioData {
+  public:
+    EioData(const Local<Value> &v, FileNodeModule *module) : m_module(module), m_req(0) {
+      m_jsCallback = Persistent<Function>::New(Local<Function>::Cast(v));
+    }
+   
+    ~EioData() {
+      m_jsCallback.Dispose();
+      m_module->remove(m_req);
+    }
+   
+    void set_eio_req(eio_req *req) { m_req = req; }
+    Handle<Function> callback() { return m_jsCallback; }
+
+  private:
+    Persistent<Function> m_jsCallback;
+    FileNodeModule *m_module;
+    eio_req *m_req;
+};
 
 static int After(eio_req *req) {
   HandleScope scope;
 
-  Persistent<Function> *callback = cb_unwrap(req->data);
+  // proteus: we use a custom data structure which holds more context information than just the callback
+  NODE_LOGM("eio response (%p)", req);
+  EioData *data = static_cast<EioData*>(req->data);
+  Handle<Function> callback = data->callback();
+
+  // proteus: setting up context is required for exception handling
+  // e.g. test-http-unix-socket.js when it fails
+  Context::Scope cscope(callback->CreationContext());
 
   uv_unref();
 
@@ -196,27 +302,46 @@ static int After(eio_req *req) {
         assert(0 && "Unhandled eio response");
     }
   }
-
+ 
   TryCatch try_catch;
-
-  (*callback)->Call(v8::Context::GetCurrent()->Global(), argc, argv);
-
+  callback->Call(callback->CreationContext()->Global(), argc, argv);
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
-
-  // Dispose of the persistent handle
-  cb_destroy(callback);
+ 
+  // proteus: deletion of data destroys the persistent handle
+  delete data;
 
   return 0;
 }
 
 #define ASYNC_CALL(func, callback, ...)                           \
-  eio_req *req = eio_##func(__VA_ARGS__, EIO_PRI_DEFAULT, After,  \
-    cb_persist(callback));                                        \
+  Handle<Object> moduleObject = args.Holder()->ToObject(); \
+  FileNodeModule *module = static_cast<FileNodeModule *>(moduleObject->GetPointerFromInternalField(1)); \
+  EioData *eio_data = new EioData(callback, module); \
+  eio_req *req = eio_##func(__VA_ARGS__, EIO_PRI_DEFAULT, After, eio_data); \
+  NODE_LOGM("eio request (%p)", req); \
+  eio_data->set_eio_req(req);           \
   assert(req);                                                    \
+  module->add(req);                                                  \
   uv_ref();                                          \
   return Undefined();
+
+static Handle<Value> Release(const Arguments& args) {
+  HandleScope scope;
+ 
+  // Get to the module object from the holder (module reference)
+  Handle<Object> moduleObject = args.Holder()->ToObject();
+  FileNodeModule *module =
+    static_cast<FileNodeModule *>(moduleObject->GetPointerFromInternalField(1));
+
+  NODE_ASSERT(module);
+  if (module) {
+    module->release();
+  }
+  return Undefined();
+}
+
 
 static Handle<Value> Close(const Arguments& args) {
   HandleScope scope;
@@ -782,7 +907,6 @@ static Handle<Value> Read(const Arguments& args) {
   cb = args[5];
 
   if (cb->IsFunction()) {
-
     ASYNC_CALL(read, cb, fd, buf, len, pos);
   } else {
     // SYNC
@@ -1019,6 +1143,10 @@ void File::Initialize(Handle<Object> target) {
   NODE_SET_METHOD(target, "utimes", UTimes);
 #endif // __POSIX__
   NODE_SET_METHOD(target, "futimes", FUTimes);
+ 
+  // proteus: add release api, to be called on process.exit event
+  // this should cleanup all the watchers that this module started..
+  NODE_SET_METHOD(target, "release", Release);
 
   errno_symbol = NODE_PSYMBOL("errno");
   encoding_symbol = NODE_PSYMBOL("node:encoding");
@@ -1027,9 +1155,17 @@ void File::Initialize(Handle<Object> target) {
 
 void InitFs(Handle<Object> target) {
   HandleScope scope;
+
+  Node *n = static_cast<Node*>(target->GetPointerFromInternalField(0));
+  FileNodeModule *module = new FileNodeModule(n);
+  NODE_LOGV("%s, node (%p), FileNodeModule(%p)",__FUNCTION__, n, module);
+  target->SetPointerInInternalField(1, module);
+
   // Initialize the stats object
-  Local<FunctionTemplate> stat_templ = FunctionTemplate::New();
-  stats_constructor_template = Persistent<FunctionTemplate>::New(stat_templ);
+  if (stats_constructor_template.IsEmpty()) {
+    Local<FunctionTemplate> stat_templ = FunctionTemplate::New();
+    stats_constructor_template = Persistent<FunctionTemplate>::New(stat_templ);
+  }
   target->Set(String::NewSymbol("Stats"),
                stats_constructor_template->GetFunction());
   File::Initialize(target);

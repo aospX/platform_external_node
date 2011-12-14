@@ -30,6 +30,9 @@
 #include "ares_config.h"
 #include "ares/inet_net_pton.h"
 
+// proteus: Fix g++ warning
+#include <arpa/inet.h>
+
 /* list used for ares task handles */
 static uv_ares_task_t* uv_ares_handles_ = NULL;
 

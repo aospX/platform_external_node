@@ -23,7 +23,6 @@
 #define SRC_FILE_H_
 
 #include <node.h>
-#include <node_events.h>
 #include <v8.h>
 
 namespace node {
@@ -34,6 +33,15 @@ class File {
 };
 
 void InitFs(v8::Handle<v8::Object> target);
+
+// proteus: moved from node.h
+// Use different stat structs & calls on windows and posix;
+// on windows, _stati64 is utf-8 and big file aware.
+# define NODE_STAT        stat
+# define NODE_FSTAT       fstat
+# define NODE_STAT_STRUCT struct stat
+v8::Local<v8::Object> BuildStatsObject(NODE_STAT_STRUCT *s);
+
 
 }  // namespace node
 #endif  // SRC_FILE_H_

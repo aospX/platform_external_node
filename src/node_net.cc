@@ -1589,7 +1589,7 @@ static int AfterResolve(eio_req *req) {
   rreq->cb->Call(Context::GetCurrent()->Global(), 2, argv);
 
   if (try_catch.HasCaught()) {
-    FatalException(try_catch);
+    Node::FatalException(try_catch);
   }
 
   if (rreq->address_list) freeaddrinfo(rreq->address_list);
