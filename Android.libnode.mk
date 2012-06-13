@@ -73,6 +73,7 @@ LOCAL_SRC_FILES := \
   deps/http_parser/http_parser.c
 
 LOCAL_CFLAGS += \
+  -fno-strict-aliasing \
   -Wno-endif-labels \
   -Wno-import \
   -Wno-format \
